@@ -1,0 +1,1163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global Settings Page Enhancement Styles */
+@layer components {
+  /* Enhanced text readability for settings */
+  .settings-text-enhanced {
+    @apply text-base sm:text-lg font-medium leading-relaxed;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Gradient text effect */
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  }
+
+  /* Glass morphism enhancement */
+  .glass-enhanced {
+    @apply backdrop-blur-xl bg-white/80 shadow-2xl;
+    backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  /* Smooth hover transitions */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-xl;
+  }
+
+  /* Enhanced focus states */
+  .focus-enhanced {
+    @apply focus:ring-4 focus:ring-blue-400/50 focus:border-blue-500;
+    @apply transition-all duration-200;
+  }
+
+  /* Profile section enhancements */
+  .profile-label {
+    @apply text-sm sm:text-base font-bold text-gray-900 mb-2;
+    @apply tracking-tight leading-snug;
+  }
+
+  .profile-value {
+    @apply text-base sm:text-lg font-medium text-gray-900;
+    @apply leading-relaxed tracking-normal;
+  }
+
+  /* Animation for profile completion bar */
+  @keyframes progressFill {
+    from {
+      width: 0%;
+    }
+    to {
+      width: var(--progress-width);
+    }
+  }
+
+  .progress-animated {
+    animation: progressFill 1s ease-out forwards;
+  }
+
+  /* Subtle pulse effect for important elements */
+  @keyframes subtlePulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+
+  .pulse-subtle {
+    animation: subtlePulse 3s ease-in-out infinite;
+  }
+
+  /* Completed tasks list enhancements */
+  .completed-task-card {
+    @apply transition-all duration-300 ease-out;
+    @apply hover:bg-white/20 hover:border-white/30;
+    @apply transform hover:-translate-y-1;
+  }
+
+  .completed-task-card:hover {
+    @apply shadow-lg;
+  }
+
+  /* Task group indicator */
+  .task-group-indicator {
+    @apply w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .task-group-primary {
+    @apply bg-gradient-to-br from-blue-500 to-purple-600;
+  }
+
+  .task-group-secondary {
+    @apply bg-gradient-to-br from-gray-500 to-gray-600;
+  }
+
+  /* 포인트 내역 UI/UX 개선 스타일 */
+  .point-history-card {
+    @apply transition-all duration-300 ease-out;
+    @apply hover:shadow-xl hover:scale-[1.02];
+    @apply transform hover:-translate-y-1;
+  }
+
+  .point-history-card:hover {
+    @apply border-opacity-100;
+  }
+
+  /* 포인트 타입별 색상 변수 */
+  .point-earned {
+    @apply bg-gradient-to-br from-emerald-400 to-teal-500;
+  }
+
+  .point-deducted {
+    @apply bg-gradient-to-br from-red-400 to-pink-500;
+  }
+
+  .point-bonus {
+    @apply bg-gradient-to-br from-yellow-400 to-orange-500;
+  }
+
+  .point-manual {
+    @apply bg-gradient-to-br from-purple-400 to-indigo-500;
+  }
+
+  /* 포인트 내역 배경 그라데이션 */
+  .point-history-bg-earned {
+    @apply bg-gradient-to-r from-emerald-100 to-teal-100;
+    @apply border-2 border-emerald-200;
+    @apply shadow-sm;
+  }
+
+  .point-history-bg-deducted {
+    @apply bg-gradient-to-r from-red-100 to-pink-100;
+    @apply border-2 border-red-200;
+    @apply shadow-sm;
+  }
+
+  .point-history-bg-bonus {
+    @apply bg-gradient-to-r from-yellow-100 to-orange-100;
+    @apply border-2 border-yellow-200;
+    @apply shadow-sm;
+  }
+
+  .point-history-bg-manual {
+    @apply bg-gradient-to-r from-purple-100 to-indigo-100;
+    @apply border-2 border-purple-200;
+    @apply shadow-sm;
+  }
+
+  /* 다크 모드 포인트 내역 배경 */
+  .dark .point-history-bg-earned {
+    @apply bg-gradient-to-r from-emerald-900/30 to-teal-900/30;
+    @apply border-2 border-emerald-700/50;
+  }
+
+  .dark .point-history-bg-deducted {
+    @apply bg-gradient-to-r from-red-900/30 to-pink-900/30;
+    @apply border-2 border-red-700/50;
+  }
+
+  .dark .point-history-bg-manual {
+    @apply bg-gradient-to-r from-purple-900/30 to-indigo-900/30;
+    @apply border-2 border-purple-700/50;
+  }
+
+  /* 포인트 내역 텍스트 색상 */
+  .point-text-earned {
+    @apply text-emerald-600;
+  }
+
+  .point-text-deducted {
+    @apply text-red-600;
+  }
+
+  .point-text-bonus {
+    @apply text-yellow-600;
+  }
+
+  .point-text-manual {
+    @apply text-purple-600;
+  }
+
+  /* 포인트 내역 아이콘 애니메이션 */
+  @keyframes pointIconPulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .point-icon-animate {
+    animation: pointIconPulse 2s ease-in-out infinite;
+  }
+
+  /* 포인트 내역 호버 효과 */
+  .point-history-hover {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .point-history-hover:hover {
+    @apply shadow-lg;
+    @apply transform scale-[1.01];
+  }
+
+  /* 포인트 내역 로딩 애니메이션 */
+  @keyframes pointHistoryShimmer {
+    0% {
+      background-position: -200px 0;
+    }
+    100% {
+      background-position: calc(200px + 100%) 0;
+    }
+  }
+
+  .point-history-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    background-size: 200px 100%;
+    animation: pointHistoryShimmer 1.5s infinite;
+  }
+
+  /* 포인트 내역 배지 스타일 */
+  .point-badge {
+    @apply px-2 py-1 text-xs rounded-full font-medium;
+    @apply transition-all duration-200;
+  }
+
+  .point-badge-bonus {
+    @apply bg-yellow-100 text-yellow-700;
+  }
+
+  .point-badge-manual {
+    @apply bg-purple-100 text-purple-700;
+  }
+
+  .point-badge-earned {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+
+  .point-badge-deducted {
+    @apply bg-red-100 text-red-700;
+  }
+
+  /* Points calculation highlight */
+  .points-calculation {
+    @apply bg-gradient-to-r from-yellow-500/20 to-orange-500/20;
+    @apply border border-yellow-500/30;
+    @apply rounded-lg p-4;
+  }
+
+  /* Task detail modal enhancements */
+  .task-detail-modal {
+    @apply backdrop-blur-sm;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .task-detail-content {
+    @apply max-h-[90vh] overflow-y-auto;
+    /* Custom scrollbar styles */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  .task-detail-content::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .task-detail-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .task-detail-content::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+
+  .task-detail-content::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Priority badge animations */
+  @keyframes priorityGlow {
+    0%,
+    100% {
+      box-shadow: 0 0 5px currentColor;
+    }
+    50% {
+      box-shadow: 0 0 15px currentColor, 0 0 25px currentColor;
+    }
+  }
+
+  .priority-high {
+    @apply bg-red-500/20 text-red-300 border-red-500/30;
+    animation: priorityGlow 2s ease-in-out infinite;
+  }
+
+  .priority-medium {
+    @apply bg-yellow-500/20 text-yellow-300 border-yellow-500/30;
+    animation: priorityGlow 3s ease-in-out infinite;
+  }
+
+  .priority-low {
+    @apply bg-green-500/20 text-green-300 border-green-500/30;
+    animation: priorityGlow 4s ease-in-out infinite;
+  }
+}
+
+/* Fixed header utility - corrected heights with proper spacing */
+.fixed-header-spacing {
+  padding-top: calc(
+    3rem + 250rem
+  ); /* Mobile header height (h-12 = 3rem) + 10x increased spacing */
+}
+
+@media (min-width: 640px) {
+  .fixed-header-spacing {
+    padding-top: calc(
+      5rem + 150rem
+    ); /* SM header height (h-20 = 5rem) + 10x increased spacing */
+  }
+}
+
+@media (min-width: 768px) {
+  .fixed-header-spacing {
+    padding-top: calc(
+      6rem + 120rem
+    ); /* MD header height (h-24 = 6rem) + 10x increased spacing */
+  }
+}
+
+@media (min-width: 1024px) {
+  .fixed-header-spacing {
+    padding-top: calc(
+      7rem + 100rem
+    ); /* LG header height (h-28 = 7rem) + 10x increased spacing */
+  }
+}
+
+@media (min-width: 1280px) {
+  .fixed-header-spacing {
+    padding-top: calc(
+      8rem + 80rem
+    ); /* XL header height (h-32 = 8rem) + 10x increased spacing */
+  }
+}
+
+@media (min-width: 1536px) {
+  .fixed-header-spacing {
+    padding-top: calc(
+      8rem + 80rem
+    ); /* 2XL header height (h-32 = 8rem) + 10x increased spacing */
+  }
+}
+
+/* Header spacing utility - responsive bottom spacing */
+.header-with-spacing::after {
+  content: '';
+  display: block;
+  height: 1rem; /* Mobile spacing */
+}
+
+@media (min-width: 640px) {
+  .header-with-spacing::after {
+    height: 1.5rem; /* SM spacing */
+  }
+}
+
+@media (min-width: 768px) {
+  .header-with-spacing::after {
+    height: 2rem; /* MD spacing */
+  }
+}
+
+@media (min-width: 1024px) {
+  .header-with-spacing::after {
+    height: 2.5rem; /* LG spacing */
+  }
+}
+
+@media (min-width: 1280px) {
+  .header-with-spacing::after {
+    height: 3rem; /* XL spacing */
+  }
+}
+
+@media (min-width: 1536px) {
+  .header-with-spacing::after {
+    height: 3.5rem; /* 2XL spacing */
+  }
+}
+
+/* =============================================================================
+ * DARK MODE STYLES
+ * ============================================================================= */
+
+/* Light mode (default) */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --border-primary: #e2e8f0;
+  --border-secondary: #cbd5e1;
+  --accent-primary: #3b82f6;
+  --accent-secondary: #1d4ed8;
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #ef4444;
+}
+
+/* Dark mode */
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --accent-primary: #60a5fa;
+  --accent-secondary: #3b82f6;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --error: #f87171;
+}
+
+/* Apply CSS variables to common elements */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Glass card variants for dark mode */
+.glass-light {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-light {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-medium {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.dark .glass-medium {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.glass-dark {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-dark {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Input and form elements */
+input,
+textarea,
+select {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-primary);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-secondary);
+}
+
+.btn-secondary {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Card styles */
+.card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+/* Moonwave Design Tokens - CSS Custom Properties */
+:root {
+  /* Foundation Colors */
+  --foundation-blue-50: #eff6ff;
+  --foundation-blue-100: #dbeafe;
+  --foundation-blue-200: #bfdbfe;
+  --foundation-blue-300: #93c5fd;
+  --foundation-blue-400: #60a5fa;
+  --foundation-blue-500: #3b82f6;
+  --foundation-blue-600: #2563eb;
+  --foundation-blue-700: #1d4ed8;
+  --foundation-blue-800: #1e40af;
+  --foundation-blue-900: #1e3a8a;
+
+  --foundation-gray-50: #f9fafb;
+  --foundation-gray-100: #f3f4f6;
+  --foundation-gray-200: #e5e7eb;
+  --foundation-gray-300: #d1d5db;
+  --foundation-gray-400: #9ca3af;
+  --foundation-gray-500: #6b7280;
+  --foundation-gray-600: #4b5563;
+  --foundation-gray-700: #374151;
+  --foundation-gray-800: #1f2937;
+  --foundation-gray-900: #111827;
+
+  --foundation-green-50: #f0fdf4;
+  --foundation-green-500: #22c55e;
+  --foundation-green-600: #16a34a;
+
+  --foundation-yellow-50: #fefce8;
+  --foundation-yellow-500: #eab308;
+  --foundation-yellow-600: #ca8a04;
+
+  --foundation-red-50: #fef2f2;
+  --foundation-red-500: #ef4444;
+  --foundation-red-600: #dc2626;
+
+  /* Foundation Spacing */
+  --foundation-spacing-0: 0;
+  --foundation-spacing-1: 0.25rem;
+  --foundation-spacing-2: 0.5rem;
+  --foundation-spacing-3: 0.75rem;
+  --foundation-spacing-4: 1rem;
+  --foundation-spacing-5: 1.25rem;
+  --foundation-spacing-6: 1.5rem;
+  --foundation-spacing-8: 2rem;
+  --foundation-spacing-10: 2.5rem;
+  --foundation-spacing-12: 3rem;
+  --foundation-spacing-16: 4rem;
+  --foundation-spacing-20: 5rem;
+  --foundation-spacing-24: 6rem;
+
+  /* Foundation Font Sizes */
+  --foundation-fontSize-xs: 0.75rem;
+  --foundation-fontSize-sm: 0.875rem;
+  --foundation-fontSize-base: 1rem;
+  --foundation-fontSize-lg: 1.125rem;
+  --foundation-fontSize-xl: 1.25rem;
+  --foundation-fontSize-2xl: 1.5rem;
+  --foundation-fontSize-3xl: 1.875rem;
+  --foundation-fontSize-4xl: 2.25rem;
+
+  /* Foundation Border Radius */
+  --foundation-borderRadius-none: 0;
+  --foundation-borderRadius-sm: 0.125rem;
+  --foundation-borderRadius-md: 0.375rem;
+  --foundation-borderRadius-lg: 0.5rem;
+  --foundation-borderRadius-xl: 0.75rem;
+  --foundation-borderRadius-2xl: 1rem;
+
+  /* Foundation Shadows */
+  --foundation-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --foundation-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --foundation-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --foundation-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Semantic Colors */
+  --semantic-primary-50: var(--foundation-blue-50);
+  --semantic-primary-500: var(--foundation-blue-500);
+  --semantic-primary-600: var(--foundation-blue-600);
+  --semantic-primary-700: var(--foundation-blue-700);
+
+  /* Missing hover states */
+  --primary-hover: var(--foundation-blue-700);
+
+  --semantic-text-primary: #ffffff;
+  --semantic-text-secondary: #f1f5f9;
+  --semantic-text-tertiary: #e2e8f0;
+  --semantic-text-inverse: #ffffff;
+
+  --semantic-background-primary: #0f172a;
+  --semantic-background-secondary: #1e293b;
+  --semantic-background-tertiary: #334155;
+
+  --semantic-border-primary: #475569;
+  --semantic-border-secondary: #64748b;
+  --semantic-border-focus: var(--foundation-blue-500);
+
+  /* Component Tokens */
+  --component-card-bg: var(--semantic-background-primary);
+  --component-card-border: var(--semantic-border-primary);
+  --component-card-padding: var(--foundation-spacing-6);
+
+  /* Spacing Tokens */
+  --spacing-0: var(--foundation-spacing-0);
+  --spacing-2: var(--foundation-spacing-2);
+  --spacing-4: var(--foundation-spacing-4);
+  --spacing-6: var(--foundation-spacing-6);
+  --spacing-8: var(--foundation-spacing-8);
+  --spacing-12: var(--foundation-spacing-12);
+  --spacing-16: var(--foundation-spacing-16);
+  --spacing-20: var(--foundation-spacing-20);
+
+  --spacing-semantic-xs: var(--spacing-2);
+  --spacing-semantic-sm: var(--spacing-4);
+  --spacing-semantic-md: var(--spacing-6);
+  --spacing-semantic-lg: var(--spacing-8);
+  --spacing-semantic-xl: var(--spacing-12);
+  --spacing-semantic-2xl: var(--spacing-16);
+  --spacing-semantic-3xl: var(--spacing-20);
+}
+
+/* 다크모드가 기본으로 설정되어 있으므로 별도 다크모드 섹션은 불필요 */
+
+@layer base {
+  /* 모바일을 제외한 모든 화면에서 Header 하단부터 컨텐츠 시작 */
+  body {
+    /* 모바일에서는 기본 패딩 없음 */
+    padding-top: 0;
+  }
+
+  /* 태블릿 이상에서 Header 하단부터 컨텐츠 시작 - 패딩 크기 75% 감소 (추가 50% 감소) */
+  @media (min-width: 640px) {
+    body {
+      padding-top: calc(
+        5rem + 0.375rem
+      ); /* SM header height (h-20 = 5rem) + spacing 75% 감소 */
+    }
+  }
+
+  @media (min-width: 768px) {
+    body {
+      padding-top: calc(
+        6rem + 0.5rem
+      ); /* MD header height (h-24 = 6rem) + spacing 75% 감소 */
+    }
+  }
+
+  @media (min-width: 1024px) {
+    body {
+      padding-top: calc(
+        7rem + 0.625rem
+      ); /* LG header height (h-28 = 7rem) + spacing 75% 감소 */
+    }
+  }
+
+  @media (min-width: 1280px) {
+    body {
+      padding-top: calc(
+        8rem + 0.75rem
+      ); /* XL header height (h-32 = 8rem) + spacing 75% 감소 */
+    }
+  }
+
+  @media (min-width: 1536px) {
+    body {
+      padding-top: calc(
+        8rem + 0.875rem
+      ); /* 2XL header height (h-32 = 8rem) + spacing 75% 감소 */
+    }
+  }
+
+  /* 한글 폰트 최적화 */
+  html {
+    font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont,
+      system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo',
+      'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji',
+      'Segoe UI Symbol', sans-serif;
+  }
+
+  /* 한글 타이포그래피 최적화 */
+  body {
+    font-family: 'Pretendard Variable', sans-serif;
+    font-feature-settings: 'liga' 1, 'kern' 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 한글 줄바꿈 최적화 */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  div {
+    word-break: keep-all;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* 한글 자간 최적화 */
+  .tracking-ko-tight {
+    letter-spacing: -0.02em;
+  }
+
+  .tracking-ko-normal {
+    letter-spacing: -0.01em;
+  }
+
+  .tracking-ko-wide {
+    letter-spacing: 0em;
+  }
+
+  /* 한글 줄간격 최적화 */
+  .leading-ko-tight {
+    line-height: 1.2;
+  }
+
+  .leading-ko-normal {
+    line-height: 1.6;
+  }
+
+  .leading-ko-relaxed {
+    line-height: 1.8;
+  }
+
+  /* 한글 줄바꿈 유틸리티 */
+  .break-keep-ko {
+    word-break: keep-all;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+@layer components {
+  /* 글래스 효과 컴포넌트 */
+  .glass-light {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+
+  .glass-medium {
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+
+  .glass-dark {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+
+  .glass-primary {
+    background: rgba(59, 130, 246, 0.25);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(59, 130, 246, 0.3);
+  }
+
+  .glass-success {
+    background: rgba(34, 197, 94, 0.25);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(34, 197, 94, 0.3);
+  }
+
+  /* 웨이브 애니메이션 */
+  @keyframes wave {
+    0% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(-25%);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+    }
+  }
+
+  .animate-wave {
+    animation: wave 8s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  .animate-glow {
+    animation: glow 3s ease-in-out infinite;
+  }
+
+  /* 모달 애니메이션 */
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes modalFadeOut {
+    from {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.9) translateY(-20px);
+    }
+  }
+
+  @keyframes backdropFadeIn {
+    from {
+      opacity: 0;
+      backdrop-filter: blur(0px);
+    }
+    to {
+      opacity: 1;
+      backdrop-filter: blur(8px);
+    }
+  }
+
+  @keyframes backdropFadeOut {
+    from {
+      opacity: 1;
+      backdrop-filter: blur(8px);
+    }
+    to {
+      opacity: 0;
+      backdrop-filter: blur(0px);
+    }
+  }
+
+  .modal-enter {
+    animation: modalFadeIn 0.3s ease-out;
+  }
+
+  .modal-exit {
+    animation: modalFadeOut 0.3s ease-in;
+  }
+
+  .backdrop-enter {
+    animation: backdropFadeIn 0.3s ease-out;
+  }
+
+  .backdrop-exit {
+    animation: backdropFadeOut 0.3s ease-in;
+  }
+
+  /* 포인트 시스템 전역 효과 */
+  .points-glow {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+    animation: pointsGlow 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes pointsGlow {
+    from {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    }
+    to {
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+    }
+  }
+
+  .points-pulse {
+    animation: pointsPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pointsPulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  .points-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(59, 130, 246, 0.1),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: pointsShimmer 3s infinite;
+  }
+
+  @keyframes pointsShimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  /* Wave Button 스타일 */
+  .wave-button {
+    @apply relative overflow-hidden rounded-lg font-medium transition-all duration-200 transform hover:-translate-y-1 active:scale-95 font-pretendard;
+  }
+
+  .wave-button-primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg hover:shadow-xl;
+  }
+
+  .wave-button-secondary {
+    @apply bg-white/10 backdrop-blur-sm text-white border border-white/20 hover:bg-white/20;
+  }
+
+  .wave-button-ghost {
+    @apply bg-transparent text-white hover:bg-white/10;
+  }
+
+  .wave-button-travel {
+    @apply bg-gradient-to-r from-green-500 to-blue-500 text-white shadow-lg hover:shadow-xl;
+  }
+
+  .wave-button-sm {
+    @apply px-3 py-2 text-sm;
+  }
+
+  .wave-button-md {
+    @apply px-4 py-2 text-base;
+  }
+
+  .wave-button-lg {
+    @apply px-6 py-3 text-lg;
+  }
+
+  .wave-button-wave {
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-opacity duration-300;
+  }
+
+  .wave-button:hover .wave-button-wave {
+    @apply opacity-100;
+  }
+
+  .wave-button-ripple {
+    @apply absolute inset-0 bg-white/30 rounded-full scale-0 animate-ping;
+  }
+
+  .wave-button-content {
+    @apply relative z-10 flex items-center gap-2;
+  }
+
+  /* Tailwind UI 스타일 컴포넌트 - Semantic Colors 사용 */
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 transform hover:-translate-y-1 font-pretendard;
+  }
+
+  .btn-secondary {
+    @apply bg-background hover:bg-muted text-foreground font-semibold py-2 px-4 rounded-lg border border-border transition-all duration-200 transform hover:-translate-y-1 font-pretendard;
+  }
+
+  .card-default {
+    @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-200 font-pretendard;
+  }
+
+  .input-default {
+    @apply bg-input border border-border rounded-md px-3 py-2 text-base font-pretendard focus:ring-2 focus:ring-ring focus:border-ring transition-all duration-200;
+  }
+
+  /* 드롭다운 스타일 개선 */
+  select {
+    @apply bg-gray-800 text-white border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200;
+  }
+
+  /* 드롭다운 옵션 스타일 */
+  select option {
+    @apply bg-gray-800 text-white;
+    padding: 8px 12px;
+  }
+
+  /* 드롭다운 옵션 호버 효과 */
+  select option:hover {
+    @apply bg-gray-700;
+  }
+
+  /* 드롭다운 옵션 선택된 상태 */
+  select option:checked {
+    @apply bg-blue-600 text-white;
+  }
+
+  /* 드롭다운 옵션 포커스 상태 */
+  select option:focus {
+    @apply bg-blue-500 text-white;
+  }
+
+  /* 모달 내부 드롭다운 특별 스타일 */
+  .modal-dropdown select {
+    @apply bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200;
+  }
+
+  .modal-dropdown select option {
+    @apply bg-gray-800 text-white;
+    padding: 8px 12px;
+  }
+
+  .modal-dropdown select option:hover {
+    @apply bg-gray-700;
+  }
+
+  .modal-dropdown select option:checked {
+    @apply bg-blue-600 text-white;
+  }
+
+  .modal-dropdown select option:focus {
+    @apply bg-blue-500 text-white;
+  }
+}
+
+@layer utilities {
+  /* 한글 폰트 유틸리티 */
+  .font-pretendard {
+    font-family: 'Pretendard Variable', sans-serif;
+  }
+
+  /* 한글 텍스트 최적화 */
+  .text-ko {
+    font-family: 'Pretendard Variable', sans-serif;
+    word-break: keep-all;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* 반응형 텍스트 크기 */
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm lg:text-base;
+  }
+
+  .text-responsive-sm {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+
+  .text-responsive-base {
+    @apply text-base sm:text-lg lg:text-xl;
+  }
+
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl lg:text-2xl;
+  }
+
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+
+  .text-responsive-2xl {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
+  }
+
+  /* 반응형 패딩/마진 */
+  .responsive-px {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .responsive-py {
+    @apply py-6 sm:py-8 lg:py-12;
+  }
+
+  .responsive-gap {
+    @apply gap-4 sm:gap-6 lg:gap-8;
+  }
+}

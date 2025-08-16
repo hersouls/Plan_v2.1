@@ -1,0 +1,1286 @@
+/* =============================================================================
+ * FONT CONFIGURATION - Korean Font
+ * ============================================================================= */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/PretendardVariable.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* =============================================================================
+   * DESIGN TOKENS - Moonwave Plan Family Task Management
+   * Based on Design Guide v2.1 - Single Source of Truth
+   * ============================================================================= */
+
+  /* Font family configuration */
+  --font-pretendard: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui,
+    Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR',
+    'Malgun Gothic', sans-serif;
+  --font-size: 16px; /* Improved base size for family readability */
+
+  /* =============================================================================
+   * FOUNDATION TOKENS - Base Design Values
+   * ============================================================================= */
+
+  /* Foundation Colors */
+  --foundation-blue-50: #eff6ff;
+  --foundation-blue-100: #dbeafe;
+  --foundation-blue-200: #bfdbfe;
+  --foundation-blue-300: #93c5fd;
+  --foundation-blue-400: #60a5fa;
+  --foundation-blue-500: #3b82f6;
+  --foundation-blue-600: #2563eb;
+  --foundation-blue-700: #1d4ed8;
+  --foundation-blue-800: #1e40af;
+  --foundation-blue-900: #1e3a8a;
+
+  --foundation-gray-50: #f9fafb;
+  --foundation-gray-100: #f3f4f6;
+  --foundation-gray-200: #e5e7eb;
+  --foundation-gray-300: #d1d5db;
+  --foundation-gray-400: #9ca3af;
+  --foundation-gray-500: #6b7280;
+  --foundation-gray-600: #4b5563;
+  --foundation-gray-700: #374151;
+  --foundation-gray-800: #1f2937;
+  --foundation-gray-900: #111827;
+
+  --foundation-green-50: #f0fdf4;
+  --foundation-green-500: #22c55e;
+  --foundation-green-600: #16a34a;
+
+  --foundation-yellow-50: #fefce8;
+  --foundation-yellow-500: #eab308;
+  --foundation-yellow-600: #ca8a04;
+
+  --foundation-red-50: #fef2f2;
+  --foundation-red-500: #ef4444;
+  --foundation-red-600: #dc2626;
+
+  --foundation-amber-500: #f59e0b;
+  --foundation-violet-500: #8b5cf6;
+  --foundation-pink-500: #ec4899;
+  --foundation-emerald-500: #10b981;
+
+  /* Foundation Spacing (8px grid) */
+  --foundation-spacing-0: 0;
+  --foundation-spacing-1: 0.25rem; /* 4px */
+  --foundation-spacing-2: 0.5rem; /* 8px */
+  --foundation-spacing-3: 0.75rem; /* 12px */
+  --foundation-spacing-4: 1rem; /* 16px */
+  --foundation-spacing-5: 1.25rem; /* 20px */
+  --foundation-spacing-6: 1.5rem; /* 24px */
+  --foundation-spacing-8: 2rem; /* 32px */
+  --foundation-spacing-10: 2.5rem; /* 40px */
+  --foundation-spacing-12: 3rem; /* 48px */
+  --foundation-spacing-16: 4rem; /* 64px */
+  --foundation-spacing-20: 5rem; /* 80px */
+  --foundation-spacing-24: 6rem; /* 96px */
+
+  /* Foundation Typography */
+  --foundation-fontSize-xs: 0.75rem; /* 12px */
+  --foundation-fontSize-sm: 0.875rem; /* 14px */
+  --foundation-fontSize-base: 1rem; /* 16px */
+  --foundation-fontSize-lg: 1.125rem; /* 18px */
+  --foundation-fontSize-xl: 1.25rem; /* 20px */
+  --foundation-fontSize-2xl: 1.5rem; /* 24px */
+  --foundation-fontSize-3xl: 1.875rem; /* 30px */
+  --foundation-fontSize-4xl: 2.25rem; /* 36px */
+
+  /* Foundation Border Radius */
+  --foundation-borderRadius-none: 0;
+  --foundation-borderRadius-sm: 0.125rem; /* 2px */
+  --foundation-borderRadius-md: 0.375rem; /* 6px */
+  --foundation-borderRadius-lg: 0.5rem; /* 8px */
+  --foundation-borderRadius-xl: 0.75rem; /* 12px */
+  --foundation-borderRadius-2xl: 1rem; /* 16px */
+
+  /* Foundation Shadow */
+  --foundation-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --foundation-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --foundation-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --foundation-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* =============================================================================
+   * SEMANTIC TOKENS - Meaningful Design Intent
+   * ============================================================================= */
+
+  /* Semantic Colors - Primary Brand */
+  --semantic-primary-50: var(--foundation-blue-50);
+  --semantic-primary-500: var(--foundation-blue-500);
+  --semantic-primary-600: var(--foundation-blue-600);
+  --semantic-primary-700: var(--foundation-blue-700);
+
+  /* Semantic Colors - Status States */
+  --semantic-success-50: var(--foundation-green-50);
+  --semantic-success-500: var(--foundation-green-500);
+  --semantic-success-600: var(--foundation-green-600);
+
+  --semantic-warning-50: var(--foundation-yellow-50);
+  --semantic-warning-500: var(--foundation-yellow-500);
+  --semantic-warning-600: var(--foundation-yellow-600);
+
+  --semantic-danger-50: var(--foundation-red-50);
+  --semantic-danger-500: var(--foundation-red-500);
+  --semantic-danger-600: var(--foundation-red-600);
+
+  /* Semantic Colors - Text (다크모드로 통일) */
+  --semantic-text-primary: #ffffff; /* Pure white for maximum contrast */
+  --semantic-text-secondary: #f1f5f9; /* 더 밝은 회색으로 가독성 향상 */
+  --semantic-text-tertiary: #e2e8f0; /* 더 밝은 회색으로 적절한 대비 */
+  --semantic-text-inverse: #ffffff;
+
+  /* Semantic Colors - Background (다크모드로 통일) */
+  --semantic-background-primary: #0f172a;
+  --semantic-background-secondary: #1e293b;
+  --semantic-background-tertiary: #334155;
+
+  /* Semantic Colors - Border (다크모드로 통일) */
+  --semantic-border-primary: #475569;
+  --semantic-border-secondary: #64748b;
+  --semantic-border-focus: var(--foundation-blue-500);
+
+  /* Semantic Spacing */
+  --semantic-spacing-xs: var(--foundation-spacing-2); /* 8px */
+  --semantic-spacing-sm: var(--foundation-spacing-4); /* 16px */
+  --semantic-spacing-md: var(--foundation-spacing-6); /* 24px */
+  --semantic-spacing-lg: var(--foundation-spacing-8); /* 32px */
+  --semantic-spacing-xl: var(--foundation-spacing-12); /* 48px */
+
+  /* =============================================================================
+   * FAMILY TASK MANAGEMENT TOKENS
+   * ============================================================================= */
+
+  /* Task Category Colors */
+  --category-home: var(--foundation-amber-500); /* 집안일 */
+  --category-work: var(--foundation-violet-500); /* 업무 */
+  --category-personal: var(--foundation-pink-500); /* 개인 */
+  --category-shopping: var(--foundation-emerald-500); /* 쇼핑 */
+  --category-etc: var(--foundation-gray-500); /* 기타 */
+
+  /* Task Status Colors */
+  --status-pending: var(--foundation-amber-500); /* 대기 */
+  --status-progress: var(--foundation-blue-500); /* 진행중 */
+  --status-completed: var(--foundation-green-500); /* 완료 */
+  --status-overdue: var(--foundation-red-500); /* 지연 */
+
+  /* Task Priority Colors */
+  --priority-high: var(--foundation-red-500); /* 긴급 */
+  --priority-medium: var(--foundation-amber-500); /* 중요 */
+  --priority-low: var(--foundation-gray-500); /* 일반 */
+
+  /* Touch Target Sizing (44px minimum) */
+  --touch-target-min: 2.75rem; /* 44px */
+  --touch-target-comfortable: 3rem; /* 48px */
+  --touch-target-large: 3.5rem; /* 56px */
+
+  /* =============================================================================
+   * COMPONENT TOKENS - Ready-to-use Component Values
+   * ============================================================================= */
+
+  /* Component: Button Primary */
+  --component-button-primary-backgroundColor: var(--semantic-primary-600);
+  --component-button-primary-color: var(--semantic-text-inverse);
+  --component-button-primary-borderRadius: var(--foundation-borderRadius-lg);
+  --component-button-primary-paddingX: var(--semantic-spacing-sm);
+  --component-button-primary-paddingY: var(--semantic-spacing-xs);
+  --component-button-primary-fontSize: var(--foundation-fontSize-base);
+  --component-button-primary-fontWeight: 600;
+  --component-button-primary-minHeight: var(--touch-target-min);
+
+  /* Component: Button Secondary */
+  --component-button-secondary-backgroundColor: var(
+    --semantic-background-primary
+  );
+  --component-button-secondary-color: var(--semantic-text-primary);
+  --component-button-secondary-border: 1px solid var(--semantic-border-primary);
+  --component-button-secondary-borderRadius: var(--foundation-borderRadius-lg);
+  --component-button-secondary-paddingX: var(--semantic-spacing-sm);
+  --component-button-secondary-paddingY: var(--semantic-spacing-xs);
+
+  /* Component: Input */
+  --component-input-backgroundColor: var(--semantic-background-primary);
+  --component-input-color: var(--semantic-text-primary);
+  --component-input-border: 1px solid var(--semantic-border-primary);
+  --component-input-borderRadius: var(--foundation-borderRadius-lg);
+  --component-input-paddingX: var(--semantic-spacing-sm);
+  --component-input-paddingY: var(--semantic-spacing-xs);
+  --component-input-fontSize: var(--foundation-fontSize-base);
+  --component-input-minHeight: var(--touch-target-min);
+
+  /* Component: Card */
+  --component-card-backgroundColor: var(--semantic-background-primary);
+  --component-card-border: 1px solid var(--semantic-border-primary);
+  --component-card-borderRadius: var(--foundation-borderRadius-xl);
+  --component-card-padding: var(--semantic-spacing-md);
+  --component-card-shadow: var(--foundation-shadow-md);
+
+  /* Component: Task Card */
+  --component-taskCard-backgroundColor: var(--semantic-background-primary);
+  --component-taskCard-border: 1px solid var(--semantic-border-primary);
+  --component-taskCard-borderRadius: var(--foundation-borderRadius-xl);
+  --component-taskCard-padding: var(--semantic-spacing-md);
+  --component-taskCard-shadow: var(--foundation-shadow-md);
+  --component-taskCard-hoverShadow: var(--foundation-shadow-lg);
+
+  /* Component: Family Avatar */
+  --component-familyAvatar-size: 2.5rem; /* 40px */
+  --component-familyAvatar-borderWidth: 2px;
+  --component-familyAvatar-borderColor: var(--semantic-primary-600);
+  --component-familyAvatar-backgroundColor: var(--semantic-primary-50);
+  --component-familyAvatar-color: var(--semantic-primary-600);
+
+  /* =============================================================================
+   * ANIMATION & INTERACTION TOKENS
+   * ============================================================================= */
+
+  /* Animation Duration */
+  --duration-fast: 150ms; /* Quick interactions */
+  --duration-normal: 300ms; /* Standard transitions */
+  --duration-slow: 500ms; /* Complex animations */
+
+  /* Animation Easing */
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Glass Morphism Effects */
+  --glass-light: rgba(255, 255, 255, 0.05);
+  --glass-medium: rgba(255, 255, 255, 0.1);
+  --glass-strong: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.2);
+
+  /* =============================================================================
+   * LAYOUT & STRUCTURE TOKENS
+   * ============================================================================= */
+
+  /* Background System (다크모드로 통일) */
+  --background: var(--semantic-background-primary);
+  --foreground: var(--semantic-text-primary);
+  --background-secondary: var(--semantic-background-secondary);
+  --background-tertiary: var(--semantic-background-tertiary);
+
+  /* Card System */
+  --card: var(--component-card-backgroundColor);
+  --card-foreground: var(--semantic-text-primary);
+  --card-border: var(--semantic-border-primary);
+  --card-shadow: var(--component-card-shadow);
+  --card-hover: var(--semantic-background-secondary);
+  --card-radius: var(--component-card-borderRadius);
+  --card-padding: var(--component-card-padding);
+
+  /* UI Element System (다크모드로 통일) */
+  --muted: var(--semantic-background-tertiary);
+  --muted-foreground: var(--semantic-text-tertiary);
+
+  --border: var(--semantic-border-primary);
+  --border-strong: var(--semantic-border-secondary);
+  --border-focus: var(--semantic-border-focus);
+
+  --input: rgba(255, 255, 255, 0.15);
+  --input-background: var(--semantic-background-secondary);
+  --input-border: var(--semantic-border-primary);
+  --input-focus: var(--semantic-border-focus);
+  --input-padding-x: var(--component-input-paddingX);
+  --input-padding-y: var(--component-input-paddingY);
+  --input-radius: var(--component-input-borderRadius);
+  --input-min-height: var(--component-input-minHeight);
+
+  --popover: var(--semantic-background-secondary);
+  --popover-foreground: var(--semantic-text-primary);
+  --popover-border: var(--semantic-border-primary);
+
+  --accent: var(--semantic-background-tertiary);
+  --accent-foreground: var(--semantic-text-primary);
+
+  /* Legacy Support */
+  --primary: var(--semantic-primary-600);
+  --primary-foreground: var(--semantic-text-inverse);
+  --primary-hover: var(--semantic-primary-700);
+  --primary-active: var(--semantic-primary-700);
+  --primary-light: var(--semantic-primary-50);
+  --primary-gradient: linear-gradient(
+    135deg,
+    var(--semantic-primary-600),
+    var(--semantic-primary-700)
+  );
+  --primary-glow: 0 0 20px rgba(59, 130, 246, 0.4);
+
+  --secondary: #a855f7;
+  --secondary-foreground: #ffffff;
+  --secondary-hover: #9333ea;
+  --secondary-active: #7e22ce;
+  --secondary-light: #e9d5ff;
+  --secondary-gradient: linear-gradient(135deg, #a855f7, #7e22ce);
+  --secondary-glow: 0 0 20px rgba(168, 85, 247, 0.4);
+
+  --success: var(--semantic-success-500);
+  --success-foreground: var(--semantic-text-inverse);
+  --success-light: var(--semantic-success-50);
+
+  --warning: var(--semantic-warning-500);
+  --warning-foreground: var(--semantic-text-inverse);
+  --warning-light: var(--semantic-warning-50);
+
+  --error: var(--semantic-danger-500);
+  --error-foreground: var(--semantic-text-inverse);
+  --error-light: var(--semantic-danger-50);
+
+  --info: var(--semantic-primary-500);
+  --info-foreground: var(--semantic-text-inverse);
+  --info-light: var(--semantic-primary-50);
+
+  --destructive: var(--semantic-danger-500);
+  --destructive-foreground: var(--semantic-text-inverse);
+  --ring: rgba(203, 213, 225, 0.4);
+  --radius: var(--foundation-borderRadius-lg);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+}
+
+/* =============================================================================
+ * DARK MODE THEME - Family-Friendly Dark Interface (통일된 다크모드)
+ * ============================================================================= */
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: rgba(var(--ring) / 0.5);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui,
+      Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo',
+      'Noto Sans KR', 'Malgun Gothic', sans-serif;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
+    h1 {
+      font-size: var(--foundation-fontSize-4xl);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: var(--foundation-fontSize-2xl);
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+    }
+
+    h3 {
+      font-size: var(--foundation-fontSize-xl);
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: -0.01em;
+    }
+
+    h4 {
+      font-size: var(--foundation-fontSize-lg);
+      font-weight: 500;
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      font-size: var(--foundation-fontSize-base);
+      font-weight: 400;
+      line-height: 1.6;
+      letter-spacing: -0.01em;
+    }
+
+    label {
+      font-size: var(--foundation-fontSize-sm);
+      font-weight: 500;
+      line-height: 1.4;
+      letter-spacing: 0;
+    }
+
+    button {
+      font-size: var(--foundation-fontSize-base);
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--foundation-fontSize-base);
+      font-weight: 400;
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+  scroll-behavior: smooth;
+}
+
+/* =============================================================================
+ * MOONWAVE PLAN FAMILY TASK ANIMATIONS
+ * ============================================================================= */
+
+/* Task completion celebration */
+@keyframes task-celebrate {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.1) rotate(5deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(-5deg);
+  }
+  75% {
+    transform: scale(1.1) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* New task appearance */
+@keyframes task-appear {
+  0% {
+    transform: translateY(20px) scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Family member online indicator */
+@keyframes member-online-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress-fill {
+  0% {
+    width: 0%;
+  }
+}
+
+@keyframes check-mark {
+  0% {
+    stroke-dashoffset: 16px;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-200%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
+/* Animation classes for Moonwave Plan */
+.animate-task-celebrate {
+  animation: task-celebrate 0.6s ease-out;
+}
+
+.animate-task-appear {
+  animation: task-appear 0.4s ease-out;
+}
+
+.animate-member-online {
+  animation: member-online-pulse 2s infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out forwards;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
+
+.animate-progress-fill {
+  animation: progress-fill 1s ease-out forwards;
+}
+
+.animate-check-mark {
+  stroke-dasharray: 16px;
+  animation: check-mark 0.4s ease-out forwards;
+}
+
+.animate-shine {
+  animation: shine 2s infinite linear;
+}
+
+/* =============================================================================
+ * MOONWAVE PLAN COMPONENT STYLES - Family Task Management
+ * ============================================================================= */
+
+/* Task Card Styles */
+.task-card {
+  background: var(--component-taskCard-backgroundColor);
+  border: var(--component-taskCard-border);
+  border-radius: var(--component-taskCard-borderRadius);
+  padding: var(--component-taskCard-padding);
+  box-shadow: var(--component-taskCard-shadow);
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--component-taskCard-hoverShadow);
+  border-color: var(--semantic-primary-600);
+}
+
+.task-card-completed {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--semantic-success-500);
+}
+
+.task-card-overdue {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--semantic-danger-500);
+}
+
+/* Task Priority Indicators */
+.task-priority-high {
+  border-left: 4px solid var(--priority-high);
+}
+
+.task-priority-medium {
+  border-left: 4px solid var(--priority-medium);
+}
+
+.task-priority-low {
+  border-left: 4px solid var(--priority-low);
+}
+
+/* Category Badge Styles */
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--semantic-spacing-xs);
+  padding: var(--foundation-spacing-1) var(--foundation-spacing-3);
+  border-radius: var(--foundation-borderRadius-md);
+  font-size: var(--foundation-fontSize-sm);
+  font-weight: 500;
+  color: white;
+}
+
+.category-home {
+  background: var(--category-home);
+}
+.category-work {
+  background: var(--category-work);
+}
+.category-personal {
+  background: var(--category-personal);
+}
+.category-shopping {
+  background: var(--category-shopping);
+}
+.category-etc {
+  background: var(--category-etc);
+}
+
+/* Family Member Avatar Styles */
+.family-avatar {
+  width: var(--component-familyAvatar-size);
+  height: var(--component-familyAvatar-size);
+  border-radius: 50%;
+  border: var(--component-familyAvatar-borderWidth) solid
+    var(--component-familyAvatar-borderColor);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--component-familyAvatar-backgroundColor);
+  font-weight: 600;
+  color: var(--component-familyAvatar-color);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.family-avatar:hover {
+  transform: scale(1.1);
+  box-shadow: var(--primary-glow);
+}
+
+/* Family Activity Feed Styles */
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: var(--semantic-spacing-sm);
+  padding: var(--semantic-spacing-sm);
+  border-radius: var(--foundation-borderRadius-lg);
+  background: var(--glass-light);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.activity-item:hover {
+  background: var(--glass-medium);
+  transform: translateX(4px);
+}
+
+/* Quick Add Task Input */
+.quick-add-input {
+  width: 100%;
+  padding: var(--component-input-paddingY) var(--component-input-paddingX);
+  background: var(--component-input-backgroundColor);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: var(--component-input-border);
+  border-radius: var(--component-input-borderRadius);
+  color: var(--foreground);
+  font-size: var(--component-input-fontSize);
+  min-height: var(--component-input-minHeight);
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.quick-add-input:focus {
+  outline: none;
+  border-color: var(--semantic-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.quick-add-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+/* Dark mode input enhancements */
+.dark .quick-add-input {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.dark .quick-add-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--semantic-primary-500);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.dark .quick-add-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Family-Friendly Touch Targets */
+.touch-target {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
+}
+
+/* Family-friendly button spacing */
+.family-button-group {
+  display: flex;
+  gap: var(--semantic-spacing-sm);
+  flex-wrap: wrap;
+}
+
+.family-button-group > * {
+  min-height: var(--touch-target-min);
+  padding: var(--foundation-spacing-3) var(--semantic-spacing-sm);
+}
+
+/* Dark mode button enhancements */
+.dark .family-button-group > * {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.dark .family-button-group > *:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.dark .family-button-group > *:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(0);
+}
+
+/* Glass morphism utilities */
+.family-glass-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--foundation-borderRadius-2xl);
+  box-shadow: var(--foundation-shadow-md);
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.family-glass-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: var(--foundation-shadow-lg);
+}
+
+/* Task-specific glass styling */
+.task-glass {
+  background: rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--foundation-borderRadius-xl);
+}
+
+/* Member card glass styling */
+.member-glass {
+  background: rgba(34, 197, 94, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: var(--foundation-borderRadius-xl);
+}
+
+/* Primary color utilities */
+.bg-primary {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.border-primary {
+  border-color: var(--primary);
+}
+
+/* State color utilities */
+.bg-success {
+  background-color: var(--success);
+  color: var(--success-foreground);
+}
+
+.bg-warning {
+  background-color: var(--warning);
+  color: var(--warning-foreground);
+}
+
+.bg-error {
+  background-color: var(--error);
+  color: var(--error-foreground);
+}
+
+.bg-info {
+  background-color: var(--info);
+  color: var(--info-foreground);
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .task-card {
+    padding: var(--semantic-spacing-sm);
+    margin-bottom: var(--foundation-spacing-3);
+  }
+
+  .family-glass-card {
+    border-radius: var(--foundation-borderRadius-xl);
+    padding: var(--semantic-spacing-sm);
+  }
+
+  .category-badge {
+    font-size: var(--foundation-fontSize-xs);
+    padding: var(--foundation-spacing-1) var(--foundation-spacing-2);
+  }
+}
+
+/* High contrast mode for accessibility */
+@media (prefers-contrast: high) {
+  .task-card {
+    border-width: 2px;
+  }
+
+  .category-badge {
+    font-weight: 700;
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-task-celebrate,
+  .animate-task-appear,
+  .animate-member-online,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-scale-in,
+  .animate-bounce-in,
+  .animate-fade-in,
+  .animate-progress-fill,
+  .animate-check-mark,
+  .animate-shine {
+    animation: none;
+    transition: none;
+  }
+
+  .task-card:hover,
+  .family-avatar:hover,
+  .activity-item:hover,
+  .family-glass-card:hover {
+    transform: none;
+  }
+}
+
+/* Focus visible styles */
+.focus-visible:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Line clamp utilities */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Korean typography utilities */
+.break-keep-ko {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 한글 자간 최적화 */
+.tracking-ko-tight {
+  letter-spacing: -0.02em;
+}
+.tracking-ko-normal {
+  letter-spacing: -0.01em;
+}
+.tracking-ko-wide {
+  letter-spacing: 0;
+}
+
+/* 숫자 최적화 */
+.text-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Typography component classes */
+.typography-h1 {
+  font-size: var(--foundation-fontSize-4xl);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-h2 {
+  font-size: var(--foundation-fontSize-3xl);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-h3 {
+  font-size: var(--foundation-fontSize-2xl);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-h4 {
+  font-size: var(--foundation-fontSize-xl);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-h5 {
+  font-size: var(--foundation-fontSize-lg);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-h6 {
+  font-size: var(--foundation-fontSize-base);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-body-large {
+  font-size: var(--foundation-fontSize-lg);
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-body {
+  font-size: var(--foundation-fontSize-base);
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-body-small {
+  font-size: var(--foundation-fontSize-sm);
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-caption {
+  font-size: var(--foundation-fontSize-xs);
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-family: var(--font-pretendard);
+}
+
+.typography-label {
+  font-size: var(--foundation-fontSize-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+/* Dark mode typography enhancements */
+.dark .typography-h1,
+.dark .typography-h2,
+.dark .typography-h3,
+.dark .typography-h4,
+.dark .typography-h5,
+.dark .typography-h6 {
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.dark .typography-body-large,
+.dark .typography-body,
+.dark .typography-body-small {
+  color: #e2e8f0;
+}
+
+.dark .typography-caption {
+  color: #cbd5e1;
+}
+
+.dark .typography-label {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.typography-display {
+  font-size: var(--foundation-fontSize-5xl);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-family: var(--font-pretendard);
+}
+
+.typography-code {
+  font-size: var(--foundation-fontSize-sm);
+  font-weight: 400;
+  line-height: 1.5;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.typography-quote {
+  font-size: var(--foundation-fontSize-lg);
+  font-weight: 400;
+  line-height: 1.6;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  font-family: var(--font-pretendard);
+}
+
+/* Performance optimizations */
+.wave-optimized {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.touch-optimized {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Wave background styles (if still using WaveBackground component) */
+.moonwave-background {
+  position: relative;
+  overflow: hidden;
+}
+
+.moonwave-wave-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.moonwave-wave-layer canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Performance optimizations for wave background */
+@media (max-width: 768px) {
+  .moonwave-wave-layer {
+    opacity: 0.8;
+  }
+}
+
+@media (max-width: 480px) {
+  .moonwave-wave-layer {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moonwave-wave-layer {
+    opacity: 0.3;
+  }
+
+  .moonwave-wave-layer canvas {
+    animation: none;
+  }
+}
+
+/* Component tokens for family task management */
+.family-glass-card {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.task-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.member-glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode specific component enhancements */
+.dark .family-glass-card {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.dark .task-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.dark .member-glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Touch-friendly design utilities */
+.touch-min {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.touch-comfortable {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.touch-large {
+  min-height: 56px;
+  min-width: 56px;
+}
+
+/* Accessibility utilities */
+.focus-visible-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2;
+}
+
+.screen-reader-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Animation utilities */
+.animate-shine {
+  animation: shine 2s ease-in-out infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+  50% {
+    transform: translateX(100%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(100%) skewX(-12deg);
+  }
+}
+
+/* Responsive utilities */
+.mobile-first {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+}
+
+.tablet-first {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+}
+
+.desktop-first {
+  @apply grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3;
+}

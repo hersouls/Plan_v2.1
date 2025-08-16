@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="Moonwave.png" />
+    <title>Plan - 가족 할일 관리</title>
+
+    <!-- 1) Google Fonts Pretendard 링크 모두 제거 -->
+    <!-- ❌ 예: https://fonts.googleapis.com/css2?family=Pretendard:... -->
+
+    <!-- 2) Pretendard 대체 - jsDelivr 한 줄 -->
+    <link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/pretendard.css" />
+
+    <!-- 3) Vite 클라이언트 + React Refresh preamble (순서 매우 중요) -->
+    <script type="module" src="/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="가족과 함께하는 스마트한 할일 관리 앱" />
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Plan" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- SEO and Social Meta Tags -->
+    <meta name="application-name" content="Plan" />
+    <meta
+      name="keywords"
+      content="할일관리, 가족, 협업, 태스크, 생산성, family task management"
+    />
+    <meta name="author" content="Moonwave" />
+    <meta property="og:title" content="Plan - 가족 할일 관리" />
+    <meta
+      property="og:description"
+      content="가족과 함께하는 스마트한 할일 관리 앱"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://plan.moonwave.kr" />
+    <meta property="og:image" content="https://plan.moonwave.kr/Moonwave.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Plan - 가족 할일 관리" />
+    <meta
+      name="twitter:description"
+      content="가족과 함께하는 스마트한 할일 관리 앱"
+    />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json" crossorigin="use-credentials" />
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="Moonwave.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="Moonwave.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="Moonwave.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="Moonwave.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- 앱 엔트리는 preamble 다음에 -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

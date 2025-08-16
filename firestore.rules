@@ -1,0 +1,174 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Simplified group functions - reduced database lookups
+    function isGroupMember(groupId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    }
+    
+    function isGroupOwner(groupId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/groups/$(groupId)) &&
+        request.auth.uid == resource.data.ownerId;
+    }
+    
+    // Simplified rules for better performance - removed catch-all rule
+    
+    // 사용자 프로필 컬렉션 보안 규칙
+    match /users/{userId} {
+      allow read: if isOwner(userId) || 
+        (isAuthenticated() && resource.data.privacy.showTaskActivity == true);
+      allow write: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // 사용자 설정 서브컬렉션
+    match /users/{userId}/settings/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // 그룹 컬렉션 보안 규칙
+    match /groups/{groupId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.ownerId;
+      allow update: if isAuthenticated() && 
+        (isGroupOwner(groupId) || 
+         (isGroupMember(groupId) && 
+          resource.data.settings.allowMembersToInvite == true));
+      allow delete: if isAuthenticated() && isGroupOwner(groupId);
+      
+      // 그룹 멤버 서브컬렉션
+      match /members/{memberId} {
+        allow read: if isGroupMember(groupId);
+        allow write: if isGroupOwner(groupId);
+      }
+      
+      // 그룹 채팅 서브컬렉션
+      match /chat/{messageId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId) && 
+          request.auth.uid == request.resource.data.userId;
+        allow update, delete: if isGroupMember(groupId) && 
+          request.auth.uid == resource.data.userId;
+      }
+    }
+    
+    // 할일(Task) 컬렉션 보안 규칙
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId ||
+         request.auth.uid == resource.data.assigneeId ||
+         (resource.data.taskType == 'group' && resource.data.groupId != null && isGroupMember(resource.data.groupId)));
+      
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.userId &&
+        ((request.resource.data.taskType == 'personal') ||
+         (request.resource.data.taskType == 'group' && request.resource.data.groupId != null && isGroupMember(request.resource.data.groupId)));
+      
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId ||
+         request.auth.uid == resource.data.assigneeId ||
+         (resource.data.taskType == 'group' && resource.data.groupId != null && isGroupMember(resource.data.groupId) && 
+          resource.data.groupId == request.resource.data.groupId));
+      
+      allow delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId ||
+         (resource.data.taskType == 'group' && resource.data.groupId != null && isGroupOwner(resource.data.groupId)));
+      
+      // Simplified comments - inherit task permissions
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && 
+          request.auth.uid == request.resource.data.userId;
+        allow update, delete: if isAuthenticated() && 
+          request.auth.uid == resource.data.userId;
+      }
+    }
+    
+    // 알림 컬렉션 보안 규칙
+    match /notifications/{notificationId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update: if isOwner(resource.data.userId) && 
+        request.resource.data.read != resource.data.read; // Only allow marking as read
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // 활동 로그 컬렉션 보안 규칙 (읽기 전용)
+    match /activities/{activityId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId ||
+         isGroupMember(resource.data.groupId));
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.userId;
+      allow update, delete: if false; // 수정/삭제 불가
+    }
+    
+    // 통계 컬렉션 보안 규칙
+    match /statistics/{userId} {
+      allow read: if isOwner(userId) || 
+        (isAuthenticated() && resource.data.public == true);
+      allow write: if isOwner(userId);
+    }
+    
+    // 그룹 초대 컬렉션
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.invitedBy ||
+         request.auth.email == resource.data.invitedEmail);
+      allow create: if isAuthenticated() && 
+        isGroupMember(request.resource.data.groupId);
+      allow update: if isAuthenticated() && 
+        request.auth.email == resource.data.invitedEmail &&
+        request.resource.data.status != resource.data.status; // Only status change
+      allow delete: if isGroupOwner(resource.data.groupId);
+    }
+    
+    // 포인트 내역 컬렉션 보안 규칙
+    match /pointHistory/{historyId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         isGroupMember(resource.data.groupId));
+      allow create: if isAuthenticated() && 
+        (request.resource.data.userId == request.auth.uid || 
+         isGroupOwner(request.resource.data.groupId));
+      allow update, delete: if isAuthenticated() && 
+        isGroupOwner(resource.data.groupId);
+    }
+    
+    // 포인트 규칙 컬렉션 보안 규칙
+    match /pointRules/{ruleId} {
+      allow read: if isAuthenticated() && 
+        isGroupMember(resource.data.groupId);
+      allow create, update, delete: if isAuthenticated() && 
+        isGroupOwner(resource.data.groupId);
+    }
+    
+    // 포인트 통계 컬렉션 보안 규칙
+    match /pointStats/{statsId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         isGroupMember(resource.data.groupId));
+      allow create, update: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         isGroupOwner(resource.data.groupId));
+    }
+    
+    // 기본 거부 규칙
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
