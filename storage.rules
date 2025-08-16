@@ -1,0 +1,124 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions for storage security
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidImageType() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidFileSize(maxSizeInMB) {
+      return request.resource.size < maxSizeInMB * 1024 * 1024;
+    }
+    
+    function isValidFileName() {
+      return request.resource.name.size() < 100; // File name length limit
+    }
+    
+    function isValidFileType() {
+      return request.resource.contentType.matches('image/.*|application/pdf|text/.*|application/msword|application/vnd.openxmlformats-officedocument.*|application/vnd.ms-excel|application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+    
+    // User profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if true; // Profile images are public
+      allow write: if isOwner(userId) && 
+        isValidImageType() && 
+        isValidFileName() &&
+        request.resource.size > 0; // 파일 크기가 0보다 크기만 확인
+      allow delete: if isOwner(userId);
+    }
+    
+    // Task files - accessible by task members
+    match /tasks/{taskId}/files/{fileName} {
+      allow read: if isAuthenticated(); // Authenticated users can read
+      allow write: if isAuthenticated() && 
+        isValidFileSize(10) && // 10MB limit for task files
+        isValidFileName() &&
+        isValidFileType();
+      allow delete: if isAuthenticated(); // Task owner or group admin should handle via app logic
+    }
+    
+    // Task comment files - accessible by task members
+    match /tasks/{taskId}/comments/{commentId}/files/{fileName} {
+      allow read: if isAuthenticated(); // Authenticated users can read
+      allow write: if isAuthenticated() && 
+        isValidFileSize(10) && // 10MB limit for comment files
+        isValidFileName() &&
+        isValidFileType();
+      allow delete: if isAuthenticated(); // Comment owner should handle via app logic
+    }
+    
+    // Task attachments - accessible by task members
+    match /tasks/{taskId}/attachments/{fileName} {
+      allow read: if isAuthenticated(); // Authenticated users can read
+      allow write: if isAuthenticated() && 
+        isValidFileSize(10) && // 10MB limit for task attachments
+        isValidFileName() &&
+        request.resource.contentType.matches('image/.*|application/pdf|text/.*|application/msword|application/vnd.openxmlformats-officedocument.*');
+      allow delete: if isAuthenticated(); // Task owner or group admin should handle via app logic
+    }
+    
+    // Task attachments (new path) - accessible by task members
+    match /task-attachments/{fileName} {
+      allow read: if isAuthenticated(); // Authenticated users can read
+      allow write: if isAuthenticated() && 
+        isValidFileSize(10) && // 10MB limit for task attachments
+        isValidFileName() &&
+        request.resource.contentType.matches('image/.*|application/pdf|text/.*|application/msword|application/vnd.openxmlformats-officedocument.*|application/vnd.ms-excel|application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      allow delete: if isAuthenticated(); // Task owner or group admin should handle via app logic
+    }
+    
+    // Group shared files
+    match /groups/{groupId}/files/{fileName} {
+      allow read: if isAuthenticated(); // Group members only (verified via app)
+      allow write: if isAuthenticated() && 
+        isValidFileSize(100) && // 100MB limit for group files
+        isValidFileName();
+      allow delete: if isAuthenticated(); // Group admin should handle via app logic
+    }
+    
+    // Group chat attachments
+    match /groups/{groupId}/chat/{userId}/{fileName} {
+      allow read: if isAuthenticated(); // Group members can read chat attachments
+      allow write: if isAuthenticated() && 
+        isValidFileSize(100) && // 100MB limit for chat attachments
+        isValidFileName() &&
+        isValidFileType();
+      allow delete: if isAuthenticated(); // Chat message owner should handle via app logic
+    }
+    
+    // Temporary uploads (for processing)
+    match /temp/{userId}/{fileName} {
+      allow read, write: if isOwner(userId) && 
+        isValidFileSize(50) && // 50MB limit for temporary files
+        isValidFileName();
+      allow delete: if isOwner(userId);
+    }
+    
+    // System files (app icons, etc.) - read only
+    match /system/{fileName} {
+      allow read: if true;
+      allow write: if false; // Only admin can upload system files
+    }
+    
+    // Backup files (admin only)
+    match /backups/{fileName} {
+      allow read, write: if false; // Only server can access backups
+    }
+    
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

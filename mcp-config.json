@@ -1,0 +1,67 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "src/"],
+      "env": {
+        "FILESYSTEM_ROOT": "./src"
+      }
+    },
+    "moonwave-tasks": {
+      "command": "node",
+      "args": ["scripts/mcp-task-server.js"],
+      "env": {
+        "FIREBASE_PROJECT_ID": "plan-e7bc6",
+        "NODE_ENV": "development"
+      }
+    },
+    "claude-dev": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/claude-dev-mcp"],
+      "env": {
+        "CLAUDE_API_KEY": "${CLAUDE_API_KEY}",
+        "PROJECT_ROOT": "."
+      }
+    },
+    "web-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-web-search"],
+      "env": {
+        "SEARCH_API_KEY": "${SEARCH_API_KEY}"
+      }
+    },
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-git"],
+      "env": {
+        "GIT_REPO_PATH": "."
+      }
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
+      }
+    }
+  },
+  "tools": {
+    "allowedCommands": [
+      "npm",
+      "node",
+      "git",
+      "firebase"
+    ],
+    "allowedPaths": [
+      "src/",
+      "scripts/",
+      "tests/",
+      "docs/"
+    ]
+  },
+  "security": {
+    "enableSandbox": true,
+    "allowNetworkAccess": true,
+    "allowFileSystem": true
+  }
+}
