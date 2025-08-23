@@ -1,9 +1,1 @@
-export { FamilyActivityWidget } from './FamilyActivityWidget';
-export { FamilyDashboard } from './FamilyDashboard';
-export { FamilyStats } from './FamilyStats';
-export { InviteModal } from './InviteModal';
-export { LeaderBoard } from './LeaderBoard';
-export { ManualInviteModal } from './ManualInviteModal';
-export { MemberCard } from './MemberCard';
-export { QRInviteModal } from './QRInviteModal';
-export { QRScannerModal } from './QRScannerModal';
+export { GroupChat } from './GroupChat';

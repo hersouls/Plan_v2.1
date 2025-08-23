@@ -1,5 +1,6 @@
 import {
   Award,
+  Brain,
   CheckCircle,
   HelpCircle,
   History,
@@ -9,7 +10,6 @@ import {
   Star,
   TrendingUp,
   Users,
-  Brain,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +19,7 @@ import { WaveBackground } from '../components/layout/WaveBackground';
 import { PointSettingsModal } from '../components/points/PointSettingsModal';
 import { PointsExplanationModal } from '../components/points/PointsExplanationModal';
 import { TaskDetailModal } from '../components/points/TaskDetailModal';
-import { PointAnalysisModal } from '../components/points/PointAnalysisModal';
+
 import { GlassCard } from '../components/ui/GlassCard';
 import { WaveButton } from '../components/ui/WaveButton';
 import { Typography } from '../components/ui/typography';
@@ -49,7 +49,9 @@ function PointsManagement() {
 
   // AI 분석 모달 상태
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  const [analysisTarget, setAnalysisTarget] = useState<PointHistory | null>(null);
+  const [analysisTarget, setAnalysisTarget] = useState<PointHistory | null>(
+    null
+  );
 
   // 즐겨찾기 그룹 관리
   const [favoriteGroups, setFavoriteGroups] = useState<string[]>([]);
@@ -194,7 +196,10 @@ function PointsManagement() {
   };
 
   // 포인트 내역 승인 (AI 분석 결과 반영 가능)
-  const handleApprovePointHistory = async (historyId: string, adjustedAmount?: number) => {
+  const handleApprovePointHistory = async (
+    historyId: string,
+    adjustedAmount?: number
+  ) => {
     if (!user) return;
 
     // 권한 체크
@@ -211,7 +216,7 @@ function PointsManagement() {
       if (adjustedAmount && analysisTarget) {
         await pointsService.updatePointHistoryAmount(historyId, adjustedAmount);
       }
-      
+
       await pointsService.approvePointHistory(historyId, user.uid);
 
       // 내역 새로고침

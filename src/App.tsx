@@ -27,7 +27,6 @@ const Login = lazy(() => import('./pages/Login'));
 const AboutUs = lazy(() => import('./components/pages/AboutUs'));
 const TermsOfService = lazy(() => import('./components/pages/TermsOfService'));
 const ProjectDetail = lazy(() => import('./components/pages/ProjectDetail'));
-const DesignTokenTest = lazy(() => import('./components/DesignTokenTest'));
 const NotFound = lazy(() => import('./components/routing/NotFound'));
 
 // Loading component with Moonwave style
@@ -80,10 +79,6 @@ function App() {
                           <Route
                             path="/project-detail/:projectId"
                             element={<ProjectDetail />}
-                          />
-                          <Route
-                            path="/design-test"
-                            element={<DesignTokenTest />}
                           />
 
                           {/* Protected routes - Todo App */}

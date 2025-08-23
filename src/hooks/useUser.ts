@@ -62,3 +62,4 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
     clearError,
   };
 }
+

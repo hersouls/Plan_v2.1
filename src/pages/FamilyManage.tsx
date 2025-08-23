@@ -17,8 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { GroupChat } from '../components/family/GroupChat';
-import { QRInviteModal } from '../components/family/QRInviteModal';
-import { QRScannerModal } from '../components/family/QRScannerModal';
+
 import { WaveBackground } from '../components/layout/WaveBackground';
 import { GlassCard } from '../components/ui/GlassCard';
 import { WaveButton } from '../components/ui/WaveButton';

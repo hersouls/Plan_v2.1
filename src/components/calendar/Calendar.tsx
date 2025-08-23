@@ -51,7 +51,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     return tasks.filter(task => {
       if (!task.dueDate) return false;
       try {
-        return isSameDay(new Date(task.dueDate), date);
+        return isSameDay(task.dueDate.toDate(), date);
       } catch {
         return false;
       }
