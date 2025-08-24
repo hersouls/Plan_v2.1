@@ -622,3 +622,5 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     </SettingsContext.Provider>
   );
 };
+
+export default SettingsProvider;
