@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import logger from '../../../lib/logger';
 import { useAuth } from '../../../contexts/AuthContext';
 import { validationService } from '../../../lib/validation';
 import { InlineLoading } from '../../common/LoadingSpinner';
@@ -39,8 +40,8 @@ export function ProfileSection({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // editData는 항상 현재 settings.profile을 사용하거나 편집 중일 때만 로컬 상태 사용
-  const [localEditData, setLocalEditData] = useState<any>(null);
-  const editData = useMemo(
+  const [localEditData, setLocalEditData] = useState<import('../types').UserProfile | null>(null);
+  const editData = useMemo<import('../types').UserProfile>(
     () => (isEditing && localEditData ? localEditData : settings.profile),
     [isEditing, localEditData, settings.profile]
   );
@@ -60,13 +61,13 @@ export function ProfileSection({
 
   // 미완료 필드 목록
   const incompleteFields = useMemo(() => {
-    const fields = [
+    const fields: Array<{ key: keyof import('../types').UserProfile; label: string; icon: React.ComponentType<{ size?: number | string; className?: string }> }> = [
       { key: 'displayName', label: '이름', icon: User },
       { key: 'phone', label: '전화번호', icon: Phone },
       { key: 'location', label: '위치', icon: MapPin },
       { key: 'bio', label: '자기소개', icon: Globe },
     ];
-    return fields.filter(field => !(settings.profile as any)[field.key]);
+    return fields.filter(field => !settings.profile[field.key]);
   }, [settings.profile]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,7 +118,7 @@ export function ProfileSection({
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Failed to upload avatar', error);
+      logger.error('ProfileSection', 'Failed to upload avatar', error);
       alert(
         error instanceof Error ? error.message : '아바타 업로드에 실패했습니다.'
       );
@@ -149,7 +150,7 @@ export function ProfileSection({
     setEditingField(fieldKey);
   };
 
-  const handleFieldSave = async (fieldKey: string) => {
+  const handleFieldSave = async (fieldKey: keyof import('../types').UserProfile) => {
     if (!localEditData) return;
 
     try {
@@ -176,7 +177,7 @@ export function ProfileSection({
       setEditingField(null);
       setFormErrors({});
     } catch (error) {
-      console.error('Failed to save field', error);
+      logger.error('ProfileSection', 'Failed to save field', error);
       alert('저장에 실패했습니다.');
     }
   };
@@ -209,7 +210,7 @@ export function ProfileSection({
       setIsEditing(false);
       setEditingField(null);
     } catch (error) {
-      console.error('Failed to save profile', error);
+      logger.error('ProfileSection', 'Failed to save profile', error);
       alert('프로필 저장에 실패했습니다.');
     }
   };
@@ -226,16 +227,15 @@ export function ProfileSection({
   };
 
   const renderField = (
-    fieldKey: string,
+    fieldKey: keyof import('../types').UserProfile,
     label: string,
     icon: React.ComponentType<{ size?: number | string; className?: string }>,
     placeholder: string,
     type: string = 'text'
   ) => {
     const isFieldEditing = editingField === fieldKey;
-    const value = isFieldEditing
-      ? (editData as any)[fieldKey] || ''
-      : (settings.profile as any)[fieldKey] || '';
+    const rawValue = isFieldEditing ? editData[fieldKey] : settings.profile[fieldKey];
+    const value = (rawValue ?? '') as string;
     const hasError = formErrors[fieldKey];
     const IconComponent = icon;
 
@@ -263,8 +263,8 @@ export function ProfileSection({
               <textarea
                 value={value}
                 onChange={e =>
-                  setLocalEditData((prev: any) => ({
-                    ...prev,
+                  setLocalEditData(prev => ({
+                    ...(prev as import('../types').UserProfile),
                     [fieldKey]: e.target.value,
                   }))
                 }
@@ -282,8 +282,8 @@ export function ProfileSection({
                 type={type}
                 value={value}
                 onChange={e =>
-                  setLocalEditData((prev: typeof settings.profile | null) => ({
-                    ...prev,
+                  setLocalEditData(prev => ({
+                    ...(prev as import('../types').UserProfile),
                     [fieldKey]: e.target.value,
                   }))
                 }
@@ -492,7 +492,7 @@ export function ProfileSection({
                               try {
                                 await deleteAvatar();
                               } catch (error) {
-                                console.error('Failed to delete avatar', error);
+                                logger.error('ProfileSection', 'Failed to delete avatar', error);
                                 alert('사진 삭제에 실패했습니다.');
                               }
                             }

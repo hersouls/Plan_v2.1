@@ -208,6 +208,7 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSettingsContext = () => {
   const context = useContext(SettingsContext);
   if (!context) {
@@ -241,7 +242,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       logger.error('SettingsContext', 'Error accessing auth context', error);
       return null;
     }
-  }, [authContext.user?.uid]);
+  }, [authContext.user]);
 
   const STORAGE_KEY = 'moonwave-settings' as const;
 
@@ -374,7 +375,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid, authContext.user]);
+  }, [currentUser, authContext.user]);
 
   const loadSettings = useCallback(async () => {
     await loadSettingsInternal();
@@ -589,7 +590,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       isInitializedRef.current = true;
       loadSettingsInternal();
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, loadSettingsInternal]);
 
   useEffect(() => {
     if (currentUser?.uid) {
@@ -605,7 +606,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
       };
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, loadSettingsInternal]);
 
   const updateProfile = useCallback((updates: Partial<UserProfile>) => {
     dispatch({ type: 'UPDATE_PROFILE', payload: updates });
