@@ -38,8 +38,6 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isActive }) => {
       { key: 'location', label: '위치', icon: MapPin },
       { key: 'bio', label: '자기소개', icon: Globe },
     ];
-    
-    return fields.filter(field => !settings.profile[field.key as keyof typeof settings.profile]);
   }, [settings.profile]);
 
   const handleEditToggle = () => {
