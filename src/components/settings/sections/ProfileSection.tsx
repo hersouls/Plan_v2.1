@@ -39,13 +39,9 @@ export function ProfileSection({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [localEditData, setLocalEditData] = useState<UserProfile | null>(null);
 
   // editData는 항상 현재 settings.profile을 사용하거나 편집 중일 때만 로컬 상태 사용
-  const [localEditData, setLocalEditData] = useState<UserProfile | null>(null);
-  const effectiveProfile = useMemo(
-    () => (isEditing && localEditData ? localEditData : settings.profile),
-    [isEditing, localEditData, settings.profile]
-  );
 
   // 프로필 완성도 계산 최적화
   const profileCompletion = useMemo(() => {
@@ -62,7 +58,6 @@ export function ProfileSection({
 
   // 미완료 필드 목록
   const incompleteFields = useMemo(() => {
-    const fields: Array<{ key: keyof UserProfile; label: string; icon: React.ComponentType<any> }> = [
       { key: 'displayName', label: '이름', icon: User },
       { key: 'phone', label: '전화번호', icon: Phone },
       { key: 'location', label: '위치', icon: MapPin },
@@ -149,17 +144,13 @@ export function ProfileSection({
     }
     setEditingField(fieldKey);
   };
-
   const handleFieldSave = async (fieldKey: keyof UserProfile) => {
     if (!localEditData) return;
 
     try {
-      // 단일 필드 검증
       const validationRules = validationService.getProfileValidationRules();
       const fieldValidation = { [fieldKey]: validationRules[fieldKey] } as const;
       const validationResult = validationService.validateFields(
-        { [fieldKey]: (localEditData as UserProfile)[fieldKey] } as Partial<UserProfile>,
-        fieldValidation as unknown as Record<string, unknown>
       );
 
       if (!validationResult.isValid) {
@@ -167,13 +158,11 @@ export function ProfileSection({
         return;
       }
 
-      // 로컬 상태 업데이트
       onUpdate({
         type: 'UPDATE_PROFILE',
         payload: { [fieldKey]: (localEditData as UserProfile)[fieldKey] } as Partial<UserProfile>,
       });
 
-      // 편집 상태 초기화
       setEditingField(null);
       setFormErrors({});
     } catch (error) {
@@ -223,10 +212,6 @@ export function ProfileSection({
     }
     return name.substring(0, 2).toUpperCase();
   };
-
-  const renderField = (
-    fieldKey: keyof UserProfile,
-    value: string,
     label: string,
     icon: React.ComponentType<{ size?: number | string; className?: string }>,
     placeholder: string,
@@ -235,6 +220,8 @@ export function ProfileSection({
     const isFieldEditing = editingField === fieldKey;
     const hasError = formErrors[fieldKey];
     const IconComponent = icon;
+    const sourceData = isEditing && localEditData ? localEditData : settings.profile;
+    const value = (sourceData?.[fieldKey] as string) || '';
 
     return (
       <div className="field-group">
@@ -261,6 +248,7 @@ export function ProfileSection({
                 value={value}
                 onChange={e =>
                   setLocalEditData(prev => ({
+                    ...(prev ?? settings.profile),
                     [fieldKey]: e.target.value,
                   }))
                 }
@@ -279,6 +267,7 @@ export function ProfileSection({
                 value={value}
                 onChange={e =>
                   setLocalEditData(prev => ({
+                    ...(prev ?? settings.profile),
                     [fieldKey]: e.target.value,
                   }))
                 }
