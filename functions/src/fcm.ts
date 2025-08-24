@@ -207,7 +207,7 @@ export async function saveNotificationRecord(
     title: string;
     message: string;
     type: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   }
 ): Promise<void> {
   try {

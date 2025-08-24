@@ -128,7 +128,7 @@ function TaskDetailPage() {
     includeActivities: true,
   });
 
-  const { toggleTaskComplete, updateTask, deleteTask } = useTasks({
+  const { toggleTaskComplete, updateTask } = useTasks({
     realtime: false,
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -234,23 +234,6 @@ function TaskDetailPage() {
     } catch (error) {
       alert('상태 변경에 실패했습니다.');
       logger.error('TaskDetailPage', 'Status change error', error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (actionLoading) return;
-
-    if (!confirm('정말로 이 할일을 삭제하시겠습니까?')) return;
-
-    setActionLoading('delete');
-    try {
-      await deleteTask(task.id);
-      navigate('/');
-    } catch (error) {
-      alert('할일 삭제에 실패했습니다.');
-      logger.error('TaskDetailPage', 'Delete error', error);
     } finally {
       setActionLoading(null);
     }

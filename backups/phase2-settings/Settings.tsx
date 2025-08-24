@@ -67,11 +67,28 @@ function Settings() {
     weekStartsOn: 1
   });
 
+  const loadSettings = async () => {
+    setLoading(true);
+    
+    // Simulate loading settings from API
+    setTimeout(() => {
+      // Load user preferences (would be from API)
+      const savedSettings = localStorage.getItem('moonwave-settings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          setSettings({ ...settings, ...parsed });
+        } catch (error) {
+          console.error('Failed to parse saved settings', error);
+        }
+      }
+      setLoading(false);
+    }, 800);
+  };
+
   useEffect(() => {
     loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  }, [loadSettings]);
     setLoading(true);
     
     // Simulate loading settings from API

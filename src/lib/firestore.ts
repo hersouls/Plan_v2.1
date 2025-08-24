@@ -596,7 +596,7 @@ export const groupService = {
           );
           const snap = await getDocs(q);
           snap.docs.forEach(d => userMap.set(d.id, d.data()));
-        } catch (err) {
+        } catch {
           // Fallback per-user reads for this chunk
           for (const memberId of chunk) {
             try {

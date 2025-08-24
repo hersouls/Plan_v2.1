@@ -189,7 +189,7 @@ export function PointSettingsModal({
       await Promise.all(upserts);
       toast.success('포인트 설정이 저장되었습니다.');
       onClose();
-    } catch (err) {
+    } catch {
       toast.error('저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setSaving(false);
