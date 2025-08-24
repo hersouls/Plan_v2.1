@@ -20,22 +20,16 @@ interface ScheduledReminder {
   createdAt: FirebaseFirestore.Timestamp;
 }
 
-// 반복 작업 처리를 위한 인터페이스
-interface RecurringTask {
-  id: string;
-  originalTaskId: string;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  interval: number;
-  endDate?: string;
-  lastGenerated: FirebaseFirestore.Timestamp;
-  nextDueDate: FirebaseFirestore.Timestamp;
-}
+type ReminderConfig = {
+  offsetMinutes: number;
+  method?: 'push' | 'email' | 'both';
+};
 
 /**
  * 매분 실행되는 알림 스케줄링 함수
  * 현재 시간에 전송해야 할 알림들을 찾아서 FCM으로 전송
  */
-export const processScheduledReminders = onSchedule('every 1 minutes', async (event) => {
+export const processScheduledReminders = onSchedule('every 1 minutes', async (_event) => {
   try {
     const now = new Date();
     const currentTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
@@ -56,7 +50,7 @@ export const processScheduledReminders = onSchedule('every 1 minutes', async (ev
     }
 
     const batch = db.batch();
-    const sendPromises: Promise<any>[] = [];
+    const sendPromises: Promise<void>[] = [];
 
     snapshot.forEach((doc) => {
       const reminder = doc.data() as ScheduledReminder;
@@ -73,14 +67,14 @@ export const processScheduledReminders = onSchedule('every 1 minutes', async (ev
             offsetMinutes: reminder.offsetMinutes.toString(),
           },
         }
-      ).then((success) => {
+      ).then(async (success) => {
         if (success) {
           logger.info(`Reminder sent successfully for task ${reminder.taskId}`);
           // 알림 전송 완료로 표시
           batch.update(doc.ref, { sent: true, sentAt: new Date() });
           
           // 알림 기록 저장
-          return saveNotificationRecord(reminder.userId, {
+          await saveNotificationRecord(reminder.userId, {
             title: '할일 알림',
             message: `"${reminder.taskTitle}" - ${reminder.offsetMinutes}분 후 마감입니다.`,
             type: 'task_reminder',
@@ -127,7 +121,7 @@ export const processScheduledReminders = onSchedule('every 1 minutes', async (ev
  * 매일 자정에 실행되는 반복 작업 생성 함수
  * 반복 설정이 있는 작업들의 다음 인스턴스를 생성
  */
-export const generateRecurringTasks = onSchedule('0 0 * * *', async (event) => {
+export const generateRecurringTasks = onSchedule('0 0 * * *', async (_event) => {
   try {
     const now = new Date();
     logger.info(`Generating recurring tasks at ${now.toISOString()}`);
@@ -238,7 +232,7 @@ export const scheduleTaskReminders = onDocumentCreated('tasks/{taskId}', async (
     const remindersRef = db.collection('scheduledReminders');
 
     // 각 알림에 대해 스케줄링
-    taskData.reminders.forEach((reminder: any) => {
+    taskData.reminders.forEach((reminder: ReminderConfig) => {
       if (reminder.offsetMinutes && taskData.dueDate) {
         const dueDate = taskData.dueDate.toDate();
         const reminderTime = new Date(dueDate.getTime() - (reminder.offsetMinutes * 60 * 1000));
@@ -297,7 +291,7 @@ export const rescheduleTaskReminders = onDocumentUpdated('tasks/{taskId}', async
 
     // 새 알림 스케줄링
     if (afterData.reminders && afterData.reminders.length > 0) {
-      afterData.reminders.forEach((reminder: any) => {
+      afterData.reminders.forEach((reminder: ReminderConfig) => {
         if (reminder.offsetMinutes && afterData.dueDate) {
           const dueDate = afterData.dueDate.toDate();
           const reminderTime = new Date(dueDate.getTime() - (reminder.offsetMinutes * 60 * 1000));
