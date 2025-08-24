@@ -1,17 +1,11 @@
-import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import React, { useReducer, useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
 import StorageService from '../../../lib/storage';
 import logger from '../../../lib/logger';
-import type {
-  DataSettings,
-  NotificationPreferences,
-  PrivacySettings,
-  SettingsAction,
-  SettingsState,
-  UserProfile,
-} from '../types';
+import type { DataSettings, NotificationPreferences, PrivacySettings, SettingsAction, SettingsState, UserProfile } from '../types';
+import { SettingsContext, type SettingsContextType } from './SettingsContextBase';
 
 // 기본 설정값
 const getDefaultSettings = (user: { displayName?: string; email?: string; photoURL?: string } | null): SettingsState => {
@@ -183,40 +177,6 @@ function settingsReducer(
     default:
       return state;
   }
-}
-
-interface SettingsContextType {
-  settings: SettingsState;
-  updateSettings: (action: SettingsAction) => void;
-  updateProfile: (updates: Partial<UserProfile>) => void;
-  updateNotifications: (updates: Partial<NotificationPreferences>) => void;
-  updatePrivacy: (updates: Partial<PrivacySettings>) => void;
-  updateData: (updates: Partial<DataSettings>) => void;
-  saveSettings: () => Promise<void>;
-  loadSettings: () => Promise<void>;
-  resetToDefaults: () => void;
-  uploadAvatar: (
-    file: File,
-    onProgress?: (progress: number) => void
-  ) => Promise<string>;
-  deleteAvatar: () => Promise<void>;
-  loading: boolean;
-  saving: boolean;
-  uploadingAvatar: boolean;
-  error: string | null;
-}
-
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useSettingsContext = () => {
-  const context = useContext(SettingsContext);
-  if (!context) {
-    throw new Error('useSettingsContext must be used within a SettingsProvider');
-  }
-  return context;
-};
-
 interface SettingsProviderProps {
   children: React.ReactNode;
 }

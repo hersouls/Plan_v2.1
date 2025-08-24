@@ -1,7 +1,7 @@
 import React from 'react';
 import { GlassCard } from '../../ui/GlassCard';
 import { Typography } from '../../ui/typography';
-import { useSettingsContext } from '../contexts/SettingsContext';
+import { useSettingsContext } from '../contexts/SettingsContextBase';
 import {
   DataSection,
   NotificationSection,

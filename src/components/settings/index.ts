@@ -5,10 +5,8 @@ export { SettingsContainer } from './SettingsContainer';
 export { SettingsModal } from './SettingsModal';
 
 // Context
-export {
-  SettingsProvider,
-  useSettingsContext,
-} from './contexts/SettingsContext';
+export { SettingsProvider } from './contexts/SettingsContext';
+export { useSettingsContext } from './contexts/SettingsContextBase';
 
 // Hooks
 export { useSettingsTab } from './hooks/useSettingsTab';
