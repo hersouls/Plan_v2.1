@@ -16,7 +16,6 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isActive }) => {
   const [localEditData, setLocalEditData] = useState(settings.profile);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [localEditData, setLocalEditData] = useState<UserProfile | null>(null);
 
 
   // 프로필 완성도 계산 최적화
@@ -40,6 +39,21 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isActive }) => {
       { key: 'location', label: '위치', icon: MapPin },
       { key: 'bio', label: '자기소개', icon: Globe },
     ];
+    
+    return fields.filter(field => {
+      switch (field.key) {
+        case 'displayName':
+          return !settings.profile.displayName;
+        case 'phone':
+          return !settings.profile.phone;
+        case 'location':
+          return !settings.profile.location;
+        case 'bio':
+          return !settings.profile.bio;
+        default:
+          return false;
+      }
+    });
   }, [settings.profile]);
 
   const handleEditToggle = () => {
@@ -64,6 +78,10 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isActive }) => {
       console.error('프로필 저장 실패:', error);
     }
   };
+
+  const handleFieldEdit = (fieldKey: string) => {
+    setEditingField(fieldKey);
+    setIsEditing(true);
   };
 
   if (!isActive) return null;
