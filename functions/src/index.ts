@@ -93,7 +93,7 @@ export const onCommentCreated = onDocumentCreated(
   'comments/{commentId}',
   async event => {
     const commentData = event.data?.data();
-    const commentId = event.params.commentId;
+    const _commentId = event.params.commentId;
 
     if (!commentData) return;
 
@@ -210,7 +210,7 @@ interface TaskData {
   userId: string;
   assigneeId: string;
   title: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 async function sendTaskAssignmentNotification(

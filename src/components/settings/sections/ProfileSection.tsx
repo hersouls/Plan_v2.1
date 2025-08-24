@@ -22,7 +22,6 @@ import { SettingsGroup } from '../components';
 import { useSettingsContext } from '../contexts/SettingsContextBase';
 import type { SettingsSectionProps } from '../types';
 import type { UserProfile } from '../types';
-import type React from 'react';
 
 export function ProfileSection({
   isActive,
@@ -59,7 +58,6 @@ export function ProfileSection({
 
   // 미완료 필드 목록
   const incompleteFields = useMemo(() => {
-    const fields: { key: keyof UserProfile; label: string; icon: any }[] = [
       { key: 'displayName', label: '이름', icon: User },
       { key: 'phone', label: '전화번호', icon: Phone },
       { key: 'location', label: '위치', icon: MapPin },
@@ -153,8 +151,6 @@ export function ProfileSection({
       const validationRules = validationService.getProfileValidationRules();
       const fieldValidation = { [fieldKey]: validationRules[fieldKey] } as const;
       const validationResult = validationService.validateFields(
-        { [fieldKey]: localEditData[fieldKey] },
-        fieldValidation as any
       );
 
       if (!validationResult.isValid) {
@@ -164,7 +160,7 @@ export function ProfileSection({
 
       onUpdate({
         type: 'UPDATE_PROFILE',
-        payload: { [fieldKey]: localEditData[fieldKey] },
+        payload: { [fieldKey]: (localEditData as UserProfile)[fieldKey] } as Partial<UserProfile>,
       });
 
       setEditingField(null);
@@ -216,8 +212,6 @@ export function ProfileSection({
     }
     return name.substring(0, 2).toUpperCase();
   };
-  const renderField = (
-    fieldKey: keyof UserProfile,
     label: string,
     icon: React.ComponentType<{ size?: number | string; className?: string }>,
     placeholder: string,

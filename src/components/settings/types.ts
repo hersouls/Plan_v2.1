@@ -1,8 +1,9 @@
+import type React from 'react';
 // Settings 모듈 전용 타입 정의
 export interface SettingsTab {
   id: string;
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<unknown>;
 }
 
 export interface UserProfile {

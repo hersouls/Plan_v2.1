@@ -1,4 +1,4 @@
-import { format, isWithinInterval, parseISO } from 'date-fns';
+import { isWithinInterval, parseISO } from 'date-fns';
 import { Notification, AdvancedFilters, NotificationGroup } from '../types/notification';
 
 export class NotificationFilterUtils {
@@ -115,7 +115,7 @@ export class NotificationFilterUtils {
 
     notifications.forEach(notification => {
       let key = '';
-      let label = '';
+      let _label = '';
 
       switch (groupBy) {
         case 'date': {
@@ -126,36 +126,36 @@ export class NotificationFilterUtils {
 
           if (diffDays === 1) {
             key = 'today';
-            label = '오늘';
+            _label = '오늘';
           } else if (diffDays === 2) {
             key = 'yesterday';
-            label = '어제';
+            _label = '어제';
           } else if (diffDays <= 7) {
             key = 'this-week';
-            label = '이번 주';
+            _label = '이번 주';
           } else if (diffDays <= 30) {
             key = 'this-month';
-            label = '이번 달';
+            _label = '이번 달';
           } else {
             key = 'older';
-            label = '이전';
+            _label = '이전';
           }
           break;
         }
 
         case 'type':
           key = notification.type;
-          label = this.getTypeLabel(notification.type);
+          _label = this.getTypeLabel(notification.type);
           break;
 
         case 'priority':
           key = notification.priority;
-          label = this.getPriorityLabel(notification.priority);
+          _label = this.getPriorityLabel(notification.priority);
           break;
 
         case 'status':
           key = notification.status;
-          label = notification.status === 'unread' ? '읽지 않음' : '읽음';
+          _label = notification.status === 'unread' ? '읽지 않음' : '읽음';
           break;
       }
 
