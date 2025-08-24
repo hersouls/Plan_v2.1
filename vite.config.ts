@@ -6,12 +6,18 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
-  const env = loadEnv(mode, process.cwd(), '');
+  loadEnv(mode, process.cwd(), '');
 
   return {
     // Use root path for Vercel deployment
     base: '/',
-    plugins: [react(), tsconfigPaths()],
+    plugins: [
+      react(),
+      tsconfigPaths({
+        // 루트 tsconfig만 사용하여 외부 서브패키지의 tsconfig 파싱 에러 회피
+        projects: ['tsconfig.json', 'tsconfig.app.json'],
+      }),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -21,9 +27,26 @@ export default defineConfig(({ mode }) => {
         '@types': path.resolve(__dirname, './src/types'),
         '@data': path.resolve(__dirname, './src/data'),
         '@styles': path.resolve(__dirname, './src/styles'),
+        // Ensure a single React instance is used across the app and any linked packages
+        react: path.resolve(__dirname, 'node_modules/react'),
+        'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+        // Ensure jsx-runtime resolves to the same React package
+        'react/jsx-runtime': path.resolve(
+          __dirname,
+          'node_modules/react/jsx-runtime.js'
+        ),
+        'react/jsx-dev-runtime': path.resolve(
+          __dirname,
+          'node_modules/react/jsx-dev-runtime.js'
+        ),
       },
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
-      dedupe: ['react', 'react-dom'],
+      dedupe: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+      ],
     },
     server: {
       host: 'localhost',
@@ -48,14 +71,19 @@ export default defineConfig(({ mode }) => {
       commonjsOptions: { include: [/node_modules/] },
       rollupOptions: {
         external: id => {
-          // Exclude Firebase optional services from main bundle
-          if (
-            id.includes('firebase/analytics') ||
-            id.includes('firebase/performance') ||
-            id.includes('firebase/messaging')
-          ) {
-            return false; // Let them be dynamically imported
+          // 외부화 규칙: 런타임에 로드되거나, 노드 내장/전역 의존성은 외부 처리
+          // 현재 프로젝트는 브라우저 앱이므로 대부분 번들에 포함. Firebase optional은 분리(dyn import)만 허용
+          const optionalFirebase = [
+            'firebase/analytics',
+            'firebase/performance',
+            'firebase/messaging',
+          ];
+          if (optionalFirebase.some(pkg => id.includes(pkg))) {
+            return false; // 번들 포함(동적 import 경로 유지) → external 아님
           }
+          // node 내장 모듈은 외부화
+          const nodeBuiltins = ['fs', 'path', 'os', 'crypto', 'stream'];
+          if (nodeBuiltins.includes(id)) return true;
           return false;
         },
         output: {

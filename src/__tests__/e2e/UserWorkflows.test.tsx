@@ -1,10 +1,9 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import App from '../../App';
-import { AuthProvider } from '../../contexts/AuthContext';
 
 // Mock Firebase auth and firestore
 jest.mock('../../lib/firebase', () => ({
@@ -98,15 +97,15 @@ describe('E2E User Workflows', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Reset mocks
     mockAuth = require('../../lib/firebase').auth;
     mockTaskService = require('../../lib/firestore').taskService;
-    
+
     // Mock window methods
     global.alert = jest.fn();
     global.confirm = jest.fn().mockReturnValue(true);
-    
+
     // Mock auth state initially as logged out
     mockAuth.onAuthStateChanged.mockImplementation((callback: any) => {
       callback(null); // No user initially
@@ -120,12 +119,16 @@ describe('E2E User Workflows', () => {
       renderApp();
 
       // 1. 로그인되지 않은 상태에서는 로그인 페이지가 표시되어야 함
-      expect(screen.getByRole('button', { name: /로그인/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /로그인/i })
+      ).toBeInTheDocument();
 
       // 2. 이메일과 비밀번호로 로그인
-      const emailInput = screen.getByPlaceholderText(/이메일/i) || screen.getByLabelText(/이메일/i);
+      const emailInput =
+        screen.getByPlaceholderText(/이메일/i) ||
+        screen.getByLabelText(/이메일/i);
       const passwordInput = screen.getByLabelText(/비밀번호/i);
-      
+
       await user.type(emailInput, 'test@example.com');
       await user.type(passwordInput, 'password123');
 
@@ -144,11 +147,16 @@ describe('E2E User Workflows', () => {
       await user.click(loginButton);
 
       // 3. 로그인 후 대시보드로 리다이렉트
-      await waitFor(() => {
-        expect(screen.getByText('📋 Moonwave Plan')).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('📋 Moonwave Plan')).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
 
-      expect(screen.getByText(/안녕하세요, 테스트 사용자님/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/안녕하세요, 테스트 사용자님/)
+      ).toBeInTheDocument();
 
       // 4. 로그아웃
       const settingsButton = screen.getByRole('button', { name: /설정/i });
@@ -157,7 +165,7 @@ describe('E2E User Workflows', () => {
       // Note: 실제 앱에서는 설정 페이지로 이동하거나 드롭다운 메뉴가 열릴 것임
       // 여기서는 로그아웃 버튼이 어딘가에 있다고 가정
       mockAuth.signOut.mockResolvedValue(undefined);
-      
+
       // Mock auth state change to logged out
       mockAuth.onAuthStateChanged.mockImplementation((callback: any) => {
         callback(null);
@@ -173,8 +181,9 @@ describe('E2E User Workflows', () => {
       renderApp();
 
       // Google 로그인 버튼 찾기
-      const googleButton = screen.getByRole('button', { name: /Google/i }) ||
-                          screen.getByText(/Google/i).closest('button');
+      const googleButton =
+        screen.getByRole('button', { name: /Google/i }) ||
+        screen.getByText(/Google/i).closest('button');
 
       if (googleButton) {
         // Mock successful Google login
@@ -243,7 +252,7 @@ describe('E2E User Workflows', () => {
 
     it('할일 생성 -> 수정 -> 완료 -> 삭제 플로우', async () => {
       const user = userEvent.setup();
-      
+
       // Mock task data that will be returned after creation
       const mockTask = {
         id: 'task-123',
@@ -474,17 +483,19 @@ describe('E2E User Workflows', () => {
       // 빠른 액션 버튼들 테스트
       const familyButton = screen.getByRole('button', { name: /가족 관리/ });
       await user.click(familyButton);
-      
+
       expect(mockNavigate).toHaveBeenCalledWith('/family');
 
-      const statisticsButton = screen.getByRole('button', { name: /통계 보기/ });
+      const statisticsButton = screen.getByRole('button', {
+        name: /통계 보기/,
+      });
       await user.click(statisticsButton);
-      
+
       expect(mockNavigate).toHaveBeenCalledWith('/statistics');
 
       const settingsButton = screen.getByRole('button', { name: /설정/ });
       await user.click(settingsButton);
-      
+
       expect(mockNavigate).toHaveBeenCalledWith('/settings');
     });
   });
@@ -499,10 +510,10 @@ describe('E2E User Workflows', () => {
 
     it('네트워크 오류 시 사용자에게 적절한 피드백 제공', async () => {
       const user = userEvent.setup();
-      
+
       // Mock task creation failure
       mockTaskService.createTask.mockRejectedValue(new Error('Network error'));
-      
+
       renderApp();
 
       await waitFor(() => {
@@ -523,17 +534,19 @@ describe('E2E User Workflows', () => {
 
     it('로그인 실패 시 적절한 에러 메시지 표시', async () => {
       const user = userEvent.setup();
-      
+
       // Mock login failure
       mockAuth.signInWithEmailAndPassword.mockRejectedValue(
         new Error('Invalid credentials')
       );
-      
+
       renderApp();
 
-      const emailInput = screen.getByPlaceholderText(/이메일/i) || screen.getByLabelText(/이메일/i);
+      const emailInput =
+        screen.getByPlaceholderText(/이메일/i) ||
+        screen.getByLabelText(/이메일/i);
       const passwordInput = screen.getByLabelText(/비밀번호/i);
-      
+
       await user.type(emailInput, 'wrong@example.com');
       await user.type(passwordInput, 'wrongpassword');
 
@@ -567,7 +580,9 @@ describe('E2E User Workflows', () => {
       expect(document.activeElement).toBe(quickAddInput);
 
       // Enter로 할일 추가
-      fireEvent.change(quickAddInput, { target: { value: '키보드로 입력한 할일' } });
+      fireEvent.change(quickAddInput, {
+        target: { value: '키보드로 입력한 할일' },
+      });
       fireEvent.keyDown(quickAddInput, { key: 'Enter' });
 
       await waitFor(() => {
@@ -625,12 +640,15 @@ describe('E2E User Workflows', () => {
       const startTime = performance.now();
       renderApp();
 
-      await waitFor(() => {
-        expect(screen.getByText('📋 Moonwave Plan')).toBeInTheDocument();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText('📋 Moonwave Plan')).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const endTime = performance.now();
-      
+
       // 렌더링이 합리적인 시간 내에 완료되는지 확인 (5초 이내)
       expect(endTime - startTime).toBeLessThan(5000);
     });

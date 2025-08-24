@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+import logger from '@/lib/logger';
+import { useCallback, useMemo, useState } from 'react';
 
 export interface UsePaginationOptions {
   totalItems: number;
@@ -6,27 +7,27 @@ export interface UsePaginationOptions {
   initialPage?: number;
 }
 
-export interface UsePaginationReturn<T> {
+export interface UsePaginationReturn {
   // Current page info
   currentPage: number;
   totalPages: number;
   startIndex: number;
   endIndex: number;
-  
+
   // Navigation
   goToPage: (page: number) => void;
   nextPage: () => void;
   prevPage: () => void;
   goToFirst: () => void;
   goToLast: () => void;
-  
+
   // State checks
   canGoPrev: boolean;
   canGoNext: boolean;
-  
+
   // Data slicing
   paginateData: <T>(data: T[]) => T[];
-  
+
   // Page numbers for pagination UI
   pageNumbers: number[];
 }
@@ -34,8 +35,8 @@ export interface UsePaginationReturn<T> {
 export function usePagination({
   totalItems,
   itemsPerPage,
-  initialPage = 1
-}: UsePaginationOptions): UsePaginationReturn<any> {
+  initialPage = 1,
+}: UsePaginationOptions): UsePaginationReturn {
   const [currentPage, setCurrentPage] = useState(initialPage);
 
   // Calculate pagination values
@@ -44,10 +45,13 @@ export function usePagination({
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
   // Navigation functions
-  const goToPage = useCallback((page: number) => {
-    const targetPage = Math.max(1, Math.min(page, totalPages));
-    setCurrentPage(targetPage);
-  }, [totalPages]);
+  const goToPage = useCallback(
+    (page: number) => {
+      const targetPage = Math.max(1, Math.min(page, totalPages));
+      setCurrentPage(targetPage);
+    },
+    [totalPages]
+  );
 
   const nextPage = useCallback(() => {
     goToPage(currentPage + 1);
@@ -70,9 +74,12 @@ export function usePagination({
   const canGoNext = currentPage < totalPages;
 
   // Data slicing function
-  const paginateData = useCallback(<T,>(data: T[]): T[] => {
-    return data.slice(startIndex, endIndex);
-  }, [startIndex, endIndex]);
+  const paginateData = useCallback(
+    <T>(data: T[]): T[] => {
+      return data.slice(startIndex, endIndex);
+    },
+    [startIndex, endIndex]
+  );
 
   // Generate page numbers for pagination UI
   const pageNumbers = useMemo(() => {
@@ -80,9 +87,11 @@ export function usePagination({
     const range: number[] = [];
     const rangeWithDots: number[] = [];
 
-    for (let i = Math.max(2, currentPage - delta); 
-         i <= Math.min(totalPages - 1, currentPage + delta); 
-         i++) {
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
       range.push(i);
     }
 
@@ -116,29 +125,32 @@ export function usePagination({
     totalPages,
     startIndex,
     endIndex,
-    
+
     // Navigation
     goToPage,
     nextPage,
     prevPage,
     goToFirst,
     goToLast,
-    
+
     // State checks
     canGoPrev,
     canGoNext,
-    
+
     // Data slicing
     paginateData,
-    
+
     // Page numbers for pagination UI
-    pageNumbers
+    pageNumbers,
   };
 }
 
 // Hook for infinite scroll pagination
 export function useInfinitePagination<T>(
-  fetchData: (page: number, limit: number) => Promise<{ data: T[], hasMore: boolean }>,
+  fetchData: (
+    page: number,
+    limit: number
+  ) => Promise<{ data: T[]; hasMore: boolean }>,
   itemsPerPage: number = 20
 ) {
   const [data, setData] = useState<T[]>([]);
@@ -153,15 +165,19 @@ export function useInfinitePagination<T>(
     try {
       setLoading(true);
       setError(null);
-      
+
       const result = await fetchData(currentPage, itemsPerPage);
-      
+
       setData(prev => [...prev, ...result.data]);
       setHasMore(result.hasMore);
       setCurrentPage(prev => prev + 1);
     } catch (err) {
-      console.error('Error loading more data:', err);
-      setError(err instanceof Error ? err.message : '데이터를 불러오는 중 오류가 발생했습니다.');
+      logger.error('useInfinitePagination', 'load more failed', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : '데이터를 불러오는 중 오류가 발생했습니다.'
+      );
     } finally {
       setLoading(false);
     }
@@ -187,6 +203,6 @@ export function useInfinitePagination<T>(
     loadMore,
     reset,
     refresh,
-    clearError: () => setError(null)
+    clearError: () => setError(null),
   };
 }

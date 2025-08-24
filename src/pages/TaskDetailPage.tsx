@@ -1,5 +1,6 @@
 import { format, formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import logger from '../lib/logger';
 import {
   AlertCircle,
   ArrowLeft,
@@ -17,14 +18,12 @@ import {
   Repeat,
   Star,
   Tag,
-  Trash2,
   User,
   Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { WaveBackground } from '../components/layout/WaveBackground';
 import { TaskDetail } from '../components/task/TaskDetail';
 import { WaveButton } from '../components/ui/WaveButton';
 import { Typography } from '../components/ui/typography';
@@ -154,8 +153,7 @@ function TaskDetailPage() {
 
   if (!taskId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
           <div className="p-6 sm:p-8 text-center max-w-md w-full">
             <div className="flex flex-col items-center gap-4">
@@ -178,8 +176,7 @@ function TaskDetailPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
           <div className="p-6 sm:p-8 text-center max-w-md w-full">
             <div className="flex flex-col items-center gap-4">
@@ -214,8 +211,7 @@ function TaskDetailPage() {
 
   if (loading || !task) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <LoadingSpinner size="lg" text="할일 정보를 불러오는 중..." />
         </div>
@@ -237,7 +233,7 @@ function TaskDetailPage() {
       }
     } catch (error) {
       alert('상태 변경에 실패했습니다.');
-      console.error('Status change error:', error);
+      logger.error('TaskDetailPage', 'Status change error', error);
     } finally {
       setActionLoading(null);
     }
@@ -254,7 +250,7 @@ function TaskDetailPage() {
       navigate('/');
     } catch (error) {
       alert('할일 삭제에 실패했습니다.');
-      console.error('Delete error:', error);
+      logger.error('TaskDetailPage', 'Delete error', error);
     } finally {
       setActionLoading(null);
     }
@@ -299,100 +295,29 @@ function TaskDetailPage() {
   const isGroupTask = task.groupId && task.groupId !== 'personal';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <WaveBackground />
-
+    <div className="min-h-screen">
       <div
         className="relative z-10 max-w-6xl xl:max-w-7xl 2xl:max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-4 sm:py-6 lg:py-8 fixed-header-spacing"
         style={{ paddingTop: '120px' }}
       >
-        {/* Mobile Header */}
-        {isMobile && (
-          <div className="mb-4">
-            <div className="p-4">
-              <div className="flex items-center justify-between">
-                <WaveButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(-1)}
-                  className="p-2"
-                >
-                  <ArrowLeft size={20} />
-                </WaveButton>
-                <Typography.H3 className="text-lg font-pretendard font-semibold">
-                  할일 상세세
-                </Typography.H3>
-                <div className="w-10" />
-              </div>
+        {/* Header with Back Button */}
+        <div className="mb-4 sm:mb-6 lg:mb-8">
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className="flex items-center gap-4">
+              <WaveButton
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(-1)}
+                className="p-2 hover:bg-white/10 transition-colors"
+              >
+                <ArrowLeft size={20} className="text-white" />
+              </WaveButton>
+              <Typography.H3 className="text-lg sm:text-2xl lg:text-3xl font-pretendard font-semibold text-white">
+                할일 상세
+              </Typography.H3>
             </div>
           </div>
-        )}
-
-        {/* Desktop Header */}
-        {!isMobile && (
-          <div className="mb-6 lg:mb-8">
-            <div className="p-6 lg:p-8">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-6">
-                <div className="flex items-center gap-4 lg:gap-6">
-                  <div className="w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                    <CheckCircle
-                      size={24}
-                      className="lg:w-8 lg:h-8 text-white"
-                    />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2 font-pretendard tracking-ko-tight">
-                      할일 상세
-                    </h1>
-                    <p className="text-white/90 text-base lg:text-lg font-pretendard leading-relaxed">
-                      생성일:{' '}
-                      {task?.createdAt
-                        ? format(
-                            toDate(task.createdAt),
-                            'yyyy년 M월 d일 EEEE',
-                            {
-                              locale: ko,
-                            }
-                          )
-                        : '날짜 정보 없음'}
-                    </p>
-                  </div>
-                </div>
-
-                {canEdit && (
-                  <div className="flex gap-3 lg:gap-4">
-                    <WaveButton
-                      variant="primary"
-                      size="lg"
-                      onClick={() => navigate(`/tasks/${task?.id}/edit`)}
-                      disabled={actionLoading === 'edit'}
-                      className="font-pretendard px-6 lg:px-8 py-3 lg:py-4 text-base lg:text-lg"
-                    >
-                      <Edit size={20} className="lg:w-6 lg:h-6" />
-                      수정
-                    </WaveButton>
-                    <WaveButton
-                      variant="secondary"
-                      size="lg"
-                      onClick={handleDelete}
-                      disabled={actionLoading === 'delete'}
-                      className="text-red-400 hover:text-red-300 font-pretendard px-6 lg:px-8 py-3 lg:py-4 text-base lg:text-lg"
-                    >
-                      {actionLoading === 'delete' ? (
-                        <LoadingSpinner size="sm" />
-                      ) : (
-                        <>
-                          <Trash2 size={20} className="lg:w-6 lg:h-6" />
-                          삭제
-                        </>
-                      )}
-                    </WaveButton>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Main Content Grid */}
         {task ? (

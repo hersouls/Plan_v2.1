@@ -48,8 +48,8 @@ if (isProduction) {
 // Validate required environment variables
 console.log('\n📋 Validating Environment Variables...')
 
-let missingVars = []
-let foundVars = []
+const missingVars = []
+const foundVars = []
 
 REQUIRED_ENV_VARS.forEach(varName => {
   if (process.env[varName]) {

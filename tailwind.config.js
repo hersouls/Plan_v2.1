@@ -172,13 +172,13 @@ export default {
         'info-light': 'var(--semantic-primary-50)',
         'secondary-light': 'var(--semantic-background-secondary)',
         
-        // Background tokens (개선된 가독성을 위한 더 밝은 색상)
+        // Background tokens (다크모드로 통일)
         'background': 'var(--semantic-background-primary)',
-        'foreground': '#1a1a1a',                    /* 더 진한 검정으로 대비 향상 */
+        'foreground': '#ffffff',                    /* 다크모드로 통일 - 흰색 */
         'muted': 'var(--semantic-background-tertiary)',
-        'muted-foreground': '#666666',              /* 중간 회색으로 적절한 대비 */
+        'muted-foreground': '#e2e8f0',              /* 다크모드로 통일 - 밝은 회색 */
         'card': 'var(--semantic-background-primary)',
-        'card-foreground': '#1a1a1a',               /* 더 진한 검정으로 대비 향상 */
+        'card-foreground': '#ffffff',               /* 다크모드로 통일 - 흰색 */
         'border': 'var(--semantic-border-primary)',
         'input': 'var(--semantic-background-primary)',
         'ring': 'var(--semantic-primary-500)',

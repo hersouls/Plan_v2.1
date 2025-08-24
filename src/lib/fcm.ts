@@ -1,11 +1,27 @@
 import { MessagePayload, getToken, onMessage } from 'firebase/messaging';
-import { messaging } from './firebase';
+import { loadMessaging, messaging } from './firebase';
+import logger from './logger';
 
-// FCM VAPID key - should be set in environment variables
-const VAPID_KEY =
-  typeof window !== 'undefined' && typeof import.meta !== 'undefined'
-    ? import.meta.env?.VITE_FCM_VAPID_KEY
-    : process.env.VITE_FCM_VAPID_KEY;
+// FCM VAPID key - prefer Vite env (browser), fallback to process.env (Node/Jest)
+const VAPID_KEY = (() => {
+  try {
+    // Prefer Vite's injected env at build time
+    // @ts-ignore - import.meta is available in Vite/browser
+    const viteEnv =
+      typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+    if (viteEnv?.VITE_FCM_VAPID_KEY)
+      return viteEnv.VITE_FCM_VAPID_KEY as string;
+  } catch {
+    /* noop */
+  }
+  // Fallback for Node/Jest where process is defined
+  // eslint-disable-next-line no-undef
+  if (typeof process !== 'undefined' && process.env?.VITE_FCM_VAPID_KEY) {
+    // eslint-disable-next-line no-undef
+    return process.env.VITE_FCM_VAPID_KEY as string;
+  }
+  return undefined;
+})();
 
 export interface NotificationPayload {
   title: string;
@@ -20,7 +36,7 @@ export interface NotificationPayload {
     title: string;
     icon?: string;
   }>;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 class FCMService {
@@ -35,26 +51,30 @@ class FCMService {
     return (
       typeof window !== 'undefined' &&
       'serviceWorker' in navigator &&
-      'Notification' in window &&
-      messaging !== null
+      'Notification' in window
     );
   }
 
   // Request notification permission
   async requestPermission(): Promise<NotificationPermission> {
     if (!this.isSupported) {
-      console.warn('FCM not supported in this environment');
+      logger.warn('fcm', 'not supported in this environment');
       return 'denied';
     }
 
     try {
       const permission = await Notification.requestPermission();
-      if (import.meta.env.DEV) {
-        console.log('Notification permission:', permission);
+      try {
+        const viteEnv = (globalThis as any)?.import?.meta?.env;
+        if (viteEnv?.DEV) {
+          logger.info('fcm', 'permission', permission);
+        }
+      } catch {
+        /* noop */
       }
       return permission;
     } catch (error) {
-      console.error('Error requesting notification permission:', error);
+      logger.error('fcm', 'request permission failed', error);
       return 'denied';
     }
   }
@@ -68,8 +88,13 @@ class FCMService {
     try {
       const permission = await this.requestPermission();
       if (permission !== 'granted') {
-        if (import.meta.env.DEV) {
-          console.log('Notification permission not granted');
+        try {
+          const viteEnv = (globalThis as any)?.import?.meta?.env;
+          if (viteEnv?.DEV) {
+            logger.info('fcm', 'permission not granted');
+          }
+        } catch {
+          /* noop */
         }
         return null;
       }
@@ -79,19 +104,29 @@ class FCMService {
       });
 
       if (token) {
-        if (import.meta.env.DEV) {
-          console.log('FCM registration token:', token);
+        try {
+          const viteEnv = (globalThis as any)?.import?.meta?.env;
+          if (viteEnv?.DEV) {
+            logger.info('fcm', 'registration token', token);
+          }
+        } catch {
+          /* noop */
         }
         this.token = token;
         return token;
       } else {
-        if (import.meta.env.DEV) {
-          console.log('No registration token available.');
+        try {
+          const viteEnv = (globalThis as any)?.import?.meta?.env;
+          if (viteEnv?.DEV) {
+            logger.info('fcm', 'no registration token');
+          }
+        } catch {
+          /* noop */
         }
         return null;
       }
     } catch (error) {
-      console.error('Error getting FCM token:', error);
+      logger.error('fcm', 'get token failed', error);
       return null;
     }
   }
@@ -100,12 +135,15 @@ class FCMService {
   async saveTokenToProfile(userId: string, token: string) {
     try {
       const { userService } = await import('./firestore');
+      // 사용자 문서에 토큰 저장 (배열 필드로 관리)
       await userService.createOrUpdateUserProfile(userId, {
-        fcmTokens: [token], // Array to support multiple devices
-        lastTokenUpdate: new Date().toISOString(),
+        ...({
+          fcmTokens: [token],
+          lastTokenUpdate: new Date().toISOString(),
+        } as unknown as Record<string, unknown>),
       });
     } catch (error) {
-      console.error('Error saving FCM token to profile:', error);
+      logger.error('fcm', 'save token failed', error);
     }
   }
 
@@ -116,8 +154,13 @@ class FCMService {
     }
 
     return onMessage(messaging, payload => {
-      if (import.meta.env.DEV) {
-        console.log('Message received in foreground:', payload);
+      try {
+        const viteEnv = (globalThis as any)?.import?.meta?.env;
+        if (viteEnv?.DEV) {
+          logger.debug('fcm', 'foreground message', payload);
+        }
+      } catch {
+        /* noop */
       }
       callback(payload);
 
@@ -137,18 +180,18 @@ class FCMService {
   private showNotification(notificationPayload: NotificationPayload) {
     if ('serviceWorker' in navigator && 'Notification' in window) {
       navigator.serviceWorker.ready.then(registration => {
-        registration.showNotification(notificationPayload.title, {
+        const options: NotificationOptions = {
           body: notificationPayload.body,
           icon: notificationPayload.icon || '/Moonwave.png',
           badge: notificationPayload.badge || '/Moonwave.png',
-          image: notificationPayload.image,
           tag: notificationPayload.tag,
           requireInteraction: notificationPayload.requireInteraction,
-          actions: notificationPayload.actions,
           data: notificationPayload.data,
           vibrate: [100, 50, 100],
           timestamp: Date.now(),
-        });
+        } as NotificationOptions;
+
+        registration.showNotification(notificationPayload.title, options);
       });
     }
   }
@@ -156,13 +199,25 @@ class FCMService {
   // Initialize FCM for a user
   async initialize(userId: string): Promise<boolean> {
     if (!this.isSupported) {
-      if (import.meta.env.DEV) {
-        console.log('FCM not supported');
+      try {
+        const viteEnv = (globalThis as any)?.import?.meta?.env;
+        if (viteEnv?.DEV) {
+          logger.info('fcm', 'not supported');
+        }
+      } catch {
+        /* noop */
       }
       return false;
     }
 
     try {
+      // Ensure Firebase Messaging is loaded in browser before requesting token
+      try {
+        await loadMessaging();
+      } catch {
+        /* noop */
+      }
+
       const token = await this.getRegistrationToken();
       if (token) {
         await this.saveTokenToProfile(userId, token);
@@ -170,8 +225,13 @@ class FCMService {
         // Set up foreground message listener
         await this.setupForegroundMessageListener(payload => {
           // Handle custom notification behavior here
-          if (import.meta.env.DEV) {
-            console.log('Foreground notification received:', payload);
+          try {
+            const viteEnv = (globalThis as any)?.import?.meta?.env;
+            if (viteEnv?.DEV) {
+              logger.debug('fcm', 'foreground notification', payload);
+            }
+          } catch {
+            /* noop */
           }
 
           // Dispatch custom event for app-specific handling
@@ -186,7 +246,7 @@ class FCMService {
       }
       return false;
     } catch (error) {
-      console.error('Error initializing FCM:', error);
+      logger.error('fcm', 'initialize failed', error);
       return false;
     }
   }
@@ -222,10 +282,7 @@ export const notificationHelpers = {
     icon: '/icons/task-assigned.png',
     tag: 'task-assignment',
     requireInteraction: true,
-    actions: [
-      { action: 'view', title: '확인하기' },
-      { action: 'dismiss', title: '나중에' },
-    ],
+    // 일부 브라우저에서 actions 미지원 → 제거
   }),
 
   // Task reminder notification
@@ -235,10 +292,7 @@ export const notificationHelpers = {
     icon: '/icons/task-reminder.png',
     tag: 'task-reminder',
     requireInteraction: true,
-    actions: [
-      { action: 'complete', title: '완료하기' },
-      { action: 'snooze', title: '나중에 알림' },
-    ],
+    // actions 제거
   }),
 
   // Task completion notification
@@ -255,10 +309,7 @@ export const notificationHelpers = {
     body: `${commenterName}님이 "${taskTitle}" 할일에 댓글을 남겼습니다.`,
     icon: '/icons/new-comment.png',
     tag: 'new-comment',
-    actions: [
-      { action: 'reply', title: '답글하기' },
-      { action: 'view', title: '확인하기' },
-    ],
+    // actions 제거
   }),
 
   // Daily summary notification

@@ -14,7 +14,15 @@ test.describe('Task Management', () => {
     
     // Setup test environment
     await helpers.mockFirebase()
-    
+    // Strengthen auth stub to avoid route race
+    await page.addInitScript(() => {
+      window.mockFirebase = window.mockFirebase || {}
+      if (window.mockFirebase.auth) {
+        window.mockFirebase.auth.currentUser = { uid: 'test-user' }
+        window.mockFirebase.auth.onAuthStateChanged = (cb: any) => { setTimeout(() => cb({ uid: 'test-user' }), 0); return () => {} }
+        window.mockFirebase.auth.signInAnonymously = () => Promise.resolve({ user: { uid: 'test-user' } })
+      }
+    })
     // Login before each test
     await loginPage.navigateTo()
     await loginPage.loginAnonymously()

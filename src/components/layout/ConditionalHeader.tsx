@@ -1,10 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { Header } from './Header';
 
 export function ConditionalHeader() {
   const location = useLocation();
-  const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // 숨겨야 하는 페이지 경로들
@@ -14,9 +13,8 @@ export function ConditionalHeader() {
   useEffect(() => {
     // 라우트 변경 시 로딩 상태 관리
     setIsLoading(true);
-    
+
     const timer = setTimeout(() => {
-      setIsVisible(!shouldHideHeader);
       setIsLoading(false);
     }, 50); // 짧은 지연으로 자연스러운 전환
 
@@ -31,7 +29,7 @@ export function ConditionalHeader() {
   // 로딩 중일 때 스켈레톤 표시 (선택적)
   if (isLoading) {
     return (
-      <div 
+      <div
         className="w-full h-16 bg-card border-b border-border animate-pulse"
         role="banner"
         aria-label="헤더 로딩 중"

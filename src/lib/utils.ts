@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -62,3 +63,104 @@ export function formatTime(date: Date | string): string {
 export function formatDateTime(date: Date | string): string {
   return `${formatDate(date)} ${formatTime(date)}`;
 }
+
+// Lightweight logger with DEV guard, tagging, and sensitive data masking
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+function maskSensitive(input: unknown): unknown {
+  const SENSITIVE_KEYS = new Set([
+    'password',
+    'token',
+    'accessToken',
+    'refreshToken',
+    'authorization',
+    'auth',
+    'secret',
+    'apiKey',
+    'email',
+    'phone',
+    'uid',
+  ]);
+
+  try {
+    if (input === null || input === undefined) return input;
+    if (typeof input === 'string') {
+      // Basic email masking
+      const maskedEmail = input.replace(
+        /([\w.-])([\w.-]*)(@[\w.-]+)/g,
+        (_m, a, b, c) => `${a}${'*'.repeat(Math.min(4, b.length))}${c}`
+      );
+      // Basic token masking
+      return maskedEmail.replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, '$1***');
+    }
+    if (Array.isArray(input)) {
+      return input.map(item => maskSensitive(item));
+    }
+    if (typeof input === 'object') {
+      const obj: Record<string, unknown> = input as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (SENSITIVE_KEYS.has(key)) {
+          out[key] = '***';
+        } else {
+          out[key] = maskSensitive(value);
+        }
+      }
+      return out;
+    }
+    return input;
+  } catch {
+    return '***';
+  }
+}
+
+function log(level: LogLevel, tag: string, ...args: unknown[]) {
+  const ts = new Date().toISOString();
+  const safeArgs = args.map(a => maskSensitive(a));
+
+  // In production, keep error logs; reduce noise for others
+  const isDev = (() => {
+    try {
+      // Vite 환경 (안전 접근)
+      type ViteEnv = { DEV?: boolean };
+      type ViteGlobal = { import?: { meta?: { env?: ViteEnv } } };
+      const viteEnv = (globalThis as unknown as ViteGlobal)?.import?.meta?.env;
+      if (viteEnv && typeof viteEnv.DEV !== 'undefined') {
+        return Boolean(viteEnv.DEV);
+      }
+    } catch {
+      /* noop */
+    }
+    const nodeEnv =
+      (typeof process !== 'undefined' && process.env?.NODE_ENV) || '';
+    return nodeEnv === 'development' || nodeEnv === 'test';
+  })();
+  if (!isDev && level !== 'error' && level !== 'warn') return;
+
+  const prefix = `[${ts}] [${tag}] [${level.toUpperCase()}]`;
+
+  const fn =
+    level === 'debug'
+      ? console.debug
+      : level === 'info'
+      ? console.info
+      : level === 'warn'
+      ? console.warn
+      : console.error;
+  try {
+    fn(prefix, ...safeArgs);
+  } catch {
+    try {
+      fn(prefix, JSON.stringify(safeArgs));
+    } catch {
+      fn(prefix, '<<unserializable>>');
+    }
+  }
+}
+
+export const logger = {
+  debug: (tag: string, ...args: unknown[]) => log('debug', tag, ...args),
+  info: (tag: string, ...args: unknown[]) => log('info', tag, ...args),
+  warn: (tag: string, ...args: unknown[]) => log('warn', tag, ...args),
+  error: (tag: string, ...args: unknown[]) => log('error', tag, ...args),
+};

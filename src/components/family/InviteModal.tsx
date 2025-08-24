@@ -1,3 +1,4 @@
+import logger from '@/lib/logger';
 import {
   Check,
   Copy,
@@ -62,7 +63,7 @@ export function InviteModal({
       setMessage('');
       // Show success message or close modal
     } catch (error) {
-      console.error('Failed to send invitation:', error);
+      logger.error('invite', 'Failed to send invitation', error);
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +77,7 @@ export function InviteModal({
       const link = await onGenerateInviteLink();
       setInviteLink(link);
     } catch (error) {
-      console.error('Failed to generate invite link:', error);
+      logger.error('invite', 'Failed to generate invite link', error);
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +89,7 @@ export function InviteModal({
       setCopied(type);
       setTimeout(() => setCopied(null), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      logger.error('invite', 'Failed to copy', error);
     }
   };
 
@@ -121,7 +122,7 @@ export function InviteModal({
             ].map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
+                onClick={() => setActiveTab(tab.key as 'email' | 'link' | 'code')}
                 className={`
                   flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium
                   border-b-2 transition-colors

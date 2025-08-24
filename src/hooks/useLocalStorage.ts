@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import logger from '../lib/logger';
 
 export function useLocalStorage<T>(
   key: string,
@@ -8,17 +9,14 @@ export function useLocalStorage<T>(
     deserialize?: (value: string) => T;
   } = {}
 ) {
-  const {
-    serialize = JSON.stringify,
-    deserialize = JSON.parse,
-  } = options;
+  const { serialize = JSON.stringify, deserialize = JSON.parse } = options;
 
   const [state, setState] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
       return item ? deserialize(item) : defaultValue;
     } catch (error) {
-      console.warn(`Error reading localStorage key "${key}":`, error);
+      logger.warn('useLocalStorage', `read key ${key} failed`, error);
       return defaultValue;
     }
   });
@@ -26,11 +24,14 @@ export function useLocalStorage<T>(
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {
       try {
-        const valueToStore = value instanceof Function ? value(state) : value;
-        setState(valueToStore);
-        window.localStorage.setItem(key, serialize(valueToStore));
+        setState(prev => {
+          const valueToStore =
+            value instanceof Function ? (value as (p: T) => T)(prev) : value;
+          window.localStorage.setItem(key, serialize(valueToStore));
+          return valueToStore;
+        });
       } catch (error) {
-        console.warn(`Error setting localStorage key "${key}":`, error);
+        logger.warn('useLocalStorage', `set key ${key} failed`, error);
       }
     },
     [key, serialize]
@@ -41,7 +42,7 @@ export function useLocalStorage<T>(
       window.localStorage.removeItem(key);
       setState(defaultValue);
     } catch (error) {
-      console.warn(`Error removing localStorage key "${key}":`, error);
+      logger.warn('useLocalStorage', `remove key ${key} failed`, error);
     }
   }, [key, defaultValue]);
 
@@ -52,7 +53,11 @@ export function useLocalStorage<T>(
         try {
           setState(deserialize(e.newValue));
         } catch (error) {
-          console.warn(`Error parsing localStorage key "${key}" from storage event:`, error);
+          logger.warn(
+            'useLocalStorage',
+            `parse key ${key} from event failed`,
+            error
+          );
         }
       }
     };

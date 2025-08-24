@@ -13,15 +13,19 @@ async function globalSetup(config: FullConfig) {
   try {
     // 1. Check if Firebase emulators are needed
     const useEmulator = process.env.VITE_USE_FIREBASE_EMULATOR === 'true';
-    
+
     if (useEmulator) {
       console.log('🔥 Starting Firebase Emulators...');
       await startFirebaseEmulators();
     }
 
     // 2. Set up test data
-    console.log('📊 Setting up test data...');
-    await setupTestData();
+    if (useEmulator) {
+      console.log('📊 Setting up test data...');
+      await setupTestData();
+    } else {
+      console.log('📊 Skipping test data setup (emulator disabled)');
+    }
 
     // 3. Create test authentication state
     console.log('👤 Setting up test authentication...');
@@ -42,23 +46,45 @@ async function startFirebaseEmulators() {
   try {
     // Check if emulators are already running
     const emulatorsRunning = await checkEmulatorsRunning();
-    
-    if (!emulatorsRunning) {
-      console.log('Starting Firebase emulators...');
-      // Start emulators in background using spawn
-      const emulatorProcess = spawn('npx', ['firebase', 'emulators:start', '--only', 'auth,firestore,storage'], {
-        detached: true,
-        stdio: 'pipe'
-      });
-      
-      // Don't wait for the process to complete, let it run in background
-      emulatorProcess.unref();
-      
-      // Wait for emulators to be ready
-      await waitForEmulators();
-    } else {
+    if (emulatorsRunning) {
       console.log('Firebase emulators already running');
+      return;
     }
+
+    console.log('Starting Firebase emulators...');
+    // Prefer local firebase-tools if available
+    const binName = process.platform === 'win32' ? 'firebase.cmd' : 'firebase';
+    const localFirebase = path.resolve(
+      process.cwd(),
+      'node_modules',
+      '.bin',
+      binName
+    );
+    const hasLocal = fs.existsSync(localFirebase);
+    const command = hasLocal
+      ? localFirebase
+      : process.platform === 'win32'
+      ? 'npx.cmd'
+      : 'npx';
+    const args = hasLocal
+      ? ['emulators:start', '--only', 'auth,firestore,storage']
+      : ['firebase', 'emulators:start', '--only', 'auth,firestore,storage'];
+
+    const emulatorProcess = spawn(command, args, {
+      detached: true,
+      stdio: 'ignore',
+      shell: false,
+    });
+
+    emulatorProcess.on('error', err => {
+      console.warn('Failed to spawn Firebase emulators process:', err);
+    });
+
+    // Let it run in background
+    emulatorProcess.unref();
+
+    // Wait for emulators to be ready
+    await waitForEmulators();
   } catch (error) {
     console.warn('Failed to start Firebase emulators:', error);
     // Continue without emulators if they fail to start
@@ -77,12 +103,12 @@ async function checkEmulatorsRunning(): Promise<boolean> {
 async function waitForEmulators() {
   const maxAttempts = 30;
   const delay = 1000;
-  
+
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const firestoreResponse = await fetch('http://localhost:8080');
       const authResponse = await fetch('http://localhost:9099');
-      
+
       if (firestoreResponse.ok && authResponse.ok) {
         console.log('✅ Firebase emulators are ready!');
         return;
@@ -90,10 +116,10 @@ async function waitForEmulators() {
     } catch {
       // Continue waiting
     }
-    
+
     await new Promise(resolve => setTimeout(resolve, delay));
   }
-  
+
   throw new Error('Firebase emulators failed to start within timeout');
 }
 
@@ -104,7 +130,7 @@ async function setupTestData() {
     execSync('node scripts/setupTestData.js', {
       stdio: 'pipe',
       timeout: 60000,
-      env: { ...process.env, NODE_ENV: 'test' }
+      env: { ...process.env, NODE_ENV: 'test' },
     });
     console.log('✅ Test data setup completed');
   } catch (error) {
@@ -123,9 +149,14 @@ async function setupTestAuth() {
 
     // Try to perform anonymous login for test state
     try {
-      await page.waitForSelector('[data-testid=\"anonymous-login\"], button:has-text(\"로그인\"), button:has-text(\"시작하기\")', { timeout: 10000 });
-      
-      const loginButton = page.locator('[data-testid=\"anonymous-login\"], button:has-text(\"시작하기\")').first();
+      await page.waitForSelector(
+        '[data-testid="anonymous-login"], button:has-text("로그인"), button:has-text("시작하기")',
+        { timeout: 10000 }
+      );
+
+      const loginButton = page
+        .locator('[data-testid="anonymous-login"], button:has-text("시작하기")')
+        .first();
       if (await loginButton.isVisible()) {
         await loginButton.click();
         await page.waitForNavigation({ timeout: 10000 });
@@ -136,11 +167,14 @@ async function setupTestAuth() {
 
     // Save authentication state for reuse in tests
     await context.storageState({ path: 'tests/auth-state.json' });
-    
+
     await browser.close();
     console.log('✅ Test authentication state saved');
   } catch (error) {
-    console.warn('Failed to setup test auth, tests will handle auth individually:', error);
+    console.warn(
+      'Failed to setup test auth, tests will handle auth individually:',
+      error
+    );
   }
 }
 
@@ -148,18 +182,18 @@ async function verifyApplication() {
   try {
     const browser = await chromium.launch();
     const page = await browser.newPage();
-    
+
     await page.goto(process.env.TEST_BASE_URL || 'http://localhost:3004');
-    
+
     // Wait for the app to load
     await page.waitForSelector('body', { timeout: 30000 });
-    
+
     // Check if the app loads without critical errors
     const title = await page.title();
     if (!title.includes('Moonwave') && !title.includes('Plan')) {
       throw new Error(`Unexpected page title: ${title}`);
     }
-    
+
     await browser.close();
     console.log('✅ Application is accessible and loads correctly');
   } catch (error) {

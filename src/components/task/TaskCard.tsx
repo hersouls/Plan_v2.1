@@ -2,13 +2,8 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { WaveButton } from '@/components/ui/WaveButton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import logger from '@/lib/logger';
+// 공유 드롭다운은 제거되었습니다
 import { cn } from '@/components/ui/utils';
 import { Task, TaskPriority } from '@/types/task';
 import {
@@ -169,7 +164,7 @@ const TaskCard: React.FC<TaskCardProps> = memo(
           isPast(toDate(task.dueDate)) &&
           task.status !== 'completed',
       };
-    }, [task?.status, task?.dueDate]);
+    }, [task]);
 
     // Memoized date formatting
     const formattedDueDate = useMemo(() => {
@@ -181,13 +176,13 @@ const TaskCard: React.FC<TaskCardProps> = memo(
       const days = differenceInDays(date, new Date());
       if (days > 0 && days <= 7) return `${days}일 후`;
       return format(date, 'M월 d일', { locale: ko });
-    }, [task?.dueDate]);
+    }, [task]);
 
     // Memoized priority config
     const PriorityIcon = useMemo(() => {
       if (!task || !task.priority) return priorityConfig.low.icon;
       return (priorityConfig[task.priority] || priorityConfig.low).icon;
-    }, [task?.priority]);
+    }, [task]);
 
     // Memoized initials for avatar
     const assigneeInitials = useMemo(() => {
@@ -250,116 +245,13 @@ const TaskCard: React.FC<TaskCardProps> = memo(
       async (e: React.MouseEvent) => {
         e.stopPropagation();
         const taskUrl = `${window.location.origin}/tasks/${task.id}`;
-        const shareData = {
-          title: `[Moonwave Plan] ${task.title}`,
-          text: `${
-            task.description || '할일 상세 정보를 확인해보세요!'
-          }\n\n마감일: ${formattedDueDate || '미정'}\n우선순위: ${
-            priorityConfig[task.priority].label
-          }`,
-          url: taskUrl,
-        };
-
-        if (navigator.share) {
-          try {
-            await navigator.share(shareData);
-          } catch (error) {
-            if ((error as Error).name !== 'AbortError') {
-              console.error('공유 실패:', error);
-              // 공유 실패 시 클립보드에 복사
-              navigator.clipboard.writeText(taskUrl);
-              console.log('링크가 클립보드에 복사되었습니다.');
-            }
-          }
-        } else {
-          // Web Share API를 지원하지 않는 경우 클립보드에 복사
-          navigator.clipboard.writeText(taskUrl);
-          console.log('링크가 클립보드에 복사되었습니다.');
-        }
+        await navigator.clipboard.writeText(taskUrl);
+        logger.info('task', '링크가 클립보드에 복사되었습니다.');
       },
-      [task.id, task.title, task.description, formattedDueDate, task.priority]
+      [task.id]
     );
 
-    const handleKakaoShare = useCallback(
-      (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const taskUrl = `${window.location.origin}/tasks/${task.id}`;
-        const shareText = `[Moonwave Plan] ${task.title}\n\n${
-          task.description || '할일 상세 정보를 확인해보세요!'
-        }\n\n마감일: ${formattedDueDate || '미정'}\n우선순위: ${
-          priorityConfig[task.priority].label
-        }\n\n링크: ${taskUrl}`;
-
-        // 먼저 링크를 클립보드에 복사
-        navigator.clipboard.writeText(taskUrl);
-
-        // 카카오톡 공유 페이지로 이동 (사용자가 직접 등록하도록 안내)
-        const kakaoUrl = `https://story.kakao.com/share?url=${encodeURIComponent(
-          taskUrl
-        )}&text=${encodeURIComponent(shareText)}`;
-        window.open(kakaoUrl, '_blank');
-
-        // TODO: 토스트 알림으로 안내 메시지 표시
-        console.log('링크가 복사되었습니다. 카카오톡에서 직접 등록해주세요.');
-      },
-      [task.id, task.title, task.description, formattedDueDate, task.priority]
-    );
-
-    const handleNativeShare = useCallback(
-      async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const taskUrl = `${window.location.origin}/tasks/${task.id}`;
-        const shareData = {
-          title: `[Moonwave Plan] ${task.title}`,
-          text: `${
-            task.description || '할일 상세 정보를 확인해보세요!'
-          }\n\n마감일: ${formattedDueDate || '미정'}\n우선순위: ${
-            priorityConfig[task.priority].label
-          }`,
-          url: taskUrl,
-        };
-
-        if (navigator.share) {
-          try {
-            await navigator.share(shareData);
-          } catch (error) {
-            if ((error as Error).name !== 'AbortError') {
-              console.error('공유 실패:', error);
-              handleCopyLink(e);
-            }
-          }
-        } else {
-          handleCopyLink(e);
-        }
-      },
-      [
-        task.id,
-        task.title,
-        task.description,
-        formattedDueDate,
-        task.priority,
-        handleCopyLink,
-      ]
-    );
-
-    const handleEmailShare = useCallback(
-      (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const taskUrl = `${window.location.origin}/tasks/${task.id}`;
-        const subject = `[Moonwave Plan] ${task.title}`;
-        const body = `${
-          task.description || '할일 상세 정보를 확인해보세요!'
-        }\n\n마감일: ${formattedDueDate || '미정'}\n우선순위: ${
-          priorityConfig[task.priority].label
-        }\n\n링크: ${taskUrl}`;
-
-        const mailtoUrl = `mailto:?subject=${encodeURIComponent(
-          subject
-        )}&body=${encodeURIComponent(body)}`;
-        window.open(mailtoUrl);
-      },
-      [task.id, task.title, task.description, formattedDueDate, task.priority]
-    );
+    // 카카오톡/이메일/네이티브 공유는 제거되었습니다. 링크 공유만 유지합니다.
 
     // Touch handlers for swipe actions (from TaskCardEnhanced)
     const handleTouchStart = useCallback(
@@ -423,7 +315,7 @@ const TaskCard: React.FC<TaskCardProps> = memo(
 
     // Early return if task is undefined or null
     if (!task) {
-      console.warn('TaskCard: task prop is undefined or null');
+      logger.warn('task', 'TaskCard: task prop is undefined or null');
       return null;
     }
 
@@ -640,65 +532,20 @@ const TaskCard: React.FC<TaskCardProps> = memo(
                 </div>
               )}
 
-              {/* 공유 드롭다운 메뉴 */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <WaveButton
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      'flex items-center justify-center p-0.5 rounded transition-all duration-200',
-                      'text-white/80 hover:text-white hover:bg-white/10 hover:scale-105',
-                      'shadow-sm hover:shadow-md'
-                    )}
-                    title="공유하기"
-                  >
-                    <Share2 className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 flex-shrink-0" />
-                  </WaveButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-56 font-pretendard glass-medium border-white/20"
-                >
-                  {/* 네이티브 공유 */}
-                  <DropdownMenuItem
-                    onClick={handleNativeShare}
-                    className="text-white hover:bg-white/10"
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    공유하기
-                  </DropdownMenuItem>
-
-                  {/* 카카오톡 공유 */}
-                  <DropdownMenuItem
-                    onClick={handleKakaoShare}
-                    className="text-white hover:bg-white/10"
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    카카오톡으로 공유
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator className="bg-white/20" />
-
-                  {/* 이메일 공유 */}
-                  <DropdownMenuItem
-                    onClick={handleEmailShare}
-                    className="text-white hover:bg-white/10"
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    이메일로 공유
-                  </DropdownMenuItem>
-
-                  {/* 링크 공유 */}
-                  <DropdownMenuItem
-                    onClick={handleCopyLink}
-                    className="text-white hover:bg-white/10"
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    링크 공유
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* 링크 공유 아이콘 */}
+              <WaveButton
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyLink}
+                className={cn(
+                  'flex items-center justify-center p-0.5 rounded transition-all duration-200',
+                  'text-white/80 hover:text-white hover:bg-white/10 hover:scale-105',
+                  'shadow-sm hover:shadow-md'
+                )}
+                title="링크 공유"
+              >
+                <Share2 className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 flex-shrink-0" />
+              </WaveButton>
 
               {/* 삭제 버튼 */}
               <WaveButton

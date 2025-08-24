@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+import logger from '@/lib/logger';
 import React, {
   createContext,
   useCallback,
@@ -64,20 +66,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [currentGroup, setCurrentGroupState] = useState<FamilyGroup | null>(
     null
   );
-  const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
-  const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [invitations] = useState<GroupInvitation[]>([]);
+  const [notifications] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isInitialLoad = useRef(true);
 
   // Load user's groups when user profile changes
   useEffect(() => {
-    console.log('DataContext - useEffect triggered');
-    console.log('DataContext - user:', user);
-    console.log('DataContext - userProfile:', userProfile);
+    if (import.meta.env.DEV) {
+      logger.debug('DataContext', 'effect triggered', { user, userProfile });
+    }
 
     if (!user || !userProfile) {
-      console.log('DataContext - No user or userProfile, clearing groups');
+      if (import.meta.env.DEV) logger.info('DataContext', 'no user/profile');
       setGroups([]);
       setCurrentGroupState(null);
       setLoading(false);
@@ -85,24 +87,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log('DataContext - userProfile.groupIds:', userProfile.groupIds);
+    if (import.meta.env.DEV)
+      logger.debug('DataContext', 'groupIds', userProfile.groupIds);
     setLoading(true);
 
     // Check localStorage for saved current group
     const savedGroupId = localStorage.getItem('currentGroupId');
-    console.log('DataContext - savedGroupId from localStorage:', savedGroupId);
+    if (import.meta.env.DEV)
+      logger.debug('DataContext', 'savedGroupId', savedGroupId);
 
     // Load all groups that user belongs to
     const loadGroups = async () => {
       try {
         const groupPromises = userProfile.groupIds.map(async groupId => {
           try {
-            console.log(`Loading group with ID: ${groupId}`);
+            if (import.meta.env.DEV)
+              logger.debug('DataContext', `load group ${groupId}`);
             const group = await groupService.getGroup(groupId);
-            console.log(`Successfully loaded group:`, group);
+            if (import.meta.env.DEV)
+              logger.debug('DataContext', 'loaded group', group);
             return group;
           } catch (error) {
-            console.error(`Failed to load group ${groupId}:`, error);
+            logger.error('DataContext', `failed group ${groupId}`, error);
             // 그룹 로딩 실패 시에도 계속 진행
             return null;
           }
@@ -113,7 +119,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           group => group !== null
         ) as FamilyGroup[];
 
-        console.log('DataContext - validGroups loaded:', validGroups);
+        if (import.meta.env.DEV)
+          logger.debug('DataContext', 'validGroups', validGroups);
         setGroups(validGroups);
 
         // Set current group logic
@@ -124,17 +131,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           if (savedGroupId) {
             const savedGroup = validGroups.find(g => g.id === savedGroupId);
             if (savedGroup) {
-              console.log('DataContext - Restoring saved group:', savedGroup);
+              if (import.meta.env.DEV)
+                logger.debug('DataContext', 'restore group', savedGroup);
               groupToSet = savedGroup;
             }
           }
 
           // If no saved group or saved group not found, use first group
           if (!groupToSet && isInitialLoad.current) {
-            console.log(
-              'DataContext - Setting current group to first group:',
-              validGroups[0]
-            );
+            if (import.meta.env.DEV)
+              logger.debug(
+                'DataContext',
+                'set current group to first',
+                validGroups[0]
+              );
             groupToSet = validGroups[0];
           }
 
@@ -143,10 +153,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             isInitialLoad.current = false;
           }
         } else {
-          console.log('DataContext - No valid groups found');
+          if (import.meta.env.DEV) logger.info('DataContext', 'no groups');
         }
       } catch (err) {
-        console.error('Error loading groups:', err);
+        logger.error('DataContext', 'load groups error', err);
         setError('그룹 정보를 불러오는데 실패했습니다.');
       } finally {
         setLoading(false);
@@ -254,7 +264,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Join group (by invite code)
   const joinGroup = useCallback(
-    async (inviteCode: string): Promise<void> => {
+    async (_inviteCode: string): Promise<void> => {
       if (!user || !userProfile) throw new Error('User not authenticated');
 
       try {
@@ -309,9 +319,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // Send invitation
   const sendInvitation = useCallback(
     async (
-      groupId: string,
-      email: string,
-      role: 'admin' | 'member'
+      _groupId: string,
+      _email: string,
+      _role: 'admin' | 'member'
     ): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
 
@@ -332,7 +342,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Respond to invitation
   const respondToInvitation = useCallback(
-    async (invitationId: string, accept: boolean): Promise<void> => {
+    async (_invitationId: string, _accept: boolean): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
 
       try {
@@ -352,7 +362,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Mark notification as read
   const markNotificationAsRead = useCallback(
-    async (notificationId: string): Promise<void> => {
+    async (_notificationId: string): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
 
       try {
@@ -389,7 +399,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // Delete notification
   const deleteNotification = useCallback(
-    async (notificationId: string): Promise<void> => {
+    async (_notificationId: string): Promise<void> => {
       if (!user) throw new Error('User not authenticated');
 
       try {

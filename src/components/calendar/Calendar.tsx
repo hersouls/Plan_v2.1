@@ -16,6 +16,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { Task } from '../../types/task';
+import { toDate } from '../../utils/dateHelpers';
 import { GlassCard } from '../ui/GlassCard';
 import { WaveButton } from '../ui/WaveButton';
 import { Typography } from '../ui/typography';
@@ -51,7 +52,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     return tasks.filter(task => {
       if (!task.dueDate) return false;
       try {
-        return isSameDay(task.dueDate.toDate(), date);
+        return isSameDay(toDate(task.dueDate), date);
       } catch {
         return false;
       }
@@ -176,7 +177,9 @@ export const Calendar: React.FC<CalendarProps> = ({
                   <div className="space-y-1">
                     {dayTasks.slice(0, 2).map((task, taskIndex) => (
                       <div
-                        key={`${task.id}-${task.groupId || 'personal'}-${dayIdx}-${taskIndex}`}
+                        key={`${task.id}-${
+                          task.groupId || 'personal'
+                        }-${dayIdx}-${taskIndex}`}
                         className={cn(
                           'text-xs px-1 py-0.5 rounded truncate',
                           task.status === 'completed'

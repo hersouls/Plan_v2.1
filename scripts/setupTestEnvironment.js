@@ -1,1 +1,125 @@
-import { initializeApp } from 'firebase/app';\nimport { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';\nimport { getAuth, connectAuthEmulator, signOut } from 'firebase/auth';\nimport { getStorage, connectStorageEmulator } from 'firebase/storage';\nimport dotenv from 'dotenv';\nimport { execSync } from 'child_process';\nimport fs from 'fs';\n\n// Load test environment variables\ndotenv.config({ path: '.env.test' });\n\n/**\n * 🧪 Comprehensive Test Environment Setup for Moonwave Plan\n * Sets up Firebase emulators, test data, and authentication for Playwright testing\n */\n\nconst isTestMode = process.env.NODE_ENV === 'test';\nconst useEmulator = process.env.VITE_USE_FIREBASE_EMULATOR === 'true';\n\n// Firebase configuration for testing\nconst firebaseConfig = {\n  apiKey: process.env.VITE_FIREBASE_API_KEY,\n  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,\n  projectId: process.env.VITE_FIREBASE_PROJECT_ID,\n  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,\n  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,\n  appId: process.env.VITE_FIREBASE_APP_ID\n};\n\nconsole.log('🚀 Setting up Moonwave Plan Test Environment...');\nconsole.log(`📊 Test Mode: ${isTestMode}`);\nconsole.log(`🔥 Use Emulator: ${useEmulator}`);\nconsole.log(`🎯 Project ID: ${firebaseConfig.projectId}`);\n\nlet app, db, auth, storage;\n\ntry {\n  // Initialize Firebase\n  app = initializeApp(firebaseConfig);\n  db = getFirestore(app);\n  auth = getAuth(app);\n  storage = getStorage(app);\n\n  // Connect to emulators if in test mode\n  if (useEmulator && isTestMode) {\n    console.log('🔌 Connecting to Firebase Emulators...');\n    \n    // Check if we need to start emulators\n    await ensureEmulatorsRunning();\n    \n    // Connect to emulators\n    try {\n      connectAuthEmulator(auth, process.env.VITE_FIREBASE_AUTH_EMULATOR_URL);\n      console.log('✅ Connected to Auth Emulator');\n    } catch (e) {\n      console.log('ℹ️ Auth Emulator already connected');\n    }\n    \n    try {\n      connectFirestoreEmulator(db, 'localhost', 8080);\n      console.log('✅ Connected to Firestore Emulator');\n    } catch (e) {\n      console.log('ℹ️ Firestore Emulator already connected');\n    }\n    \n    try {\n      connectStorageEmulator(storage, 'localhost', 9199);\n      console.log('✅ Connected to Storage Emulator');\n    } catch (e) {\n      console.log('ℹ️ Storage Emulator already connected');\n    }\n  }\n\n  // Set up test data and permissions\n  await setupTestEnvironment();\n  \n  console.log('✅ Test environment setup completed successfully!');\n  \n} catch (error) {\n  console.error('❌ Test environment setup failed:', error);\n  process.exit(1);\n}\n\n/**\n * Ensure Firebase emulators are running\n */\nasync function ensureEmulatorsRunning() {\n  try {\n    // Check if emulators are already running\n    const response = await fetch('http://localhost:8080');\n    if (response.ok) {\n      console.log('✅ Firebase emulators already running');\n      return;\n    }\n  } catch {\n    // Emulators not running, start them\n  }\n  \n  console.log('🚀 Starting Firebase Emulators...');\n  \n  try {\n    // Start emulators in detached mode\n    execSync('npx firebase emulators:start --only auth,firestore,storage --detach', {\n      stdio: 'pipe',\n      timeout: 60000\n    });\n    \n    // Wait for emulators to be ready\n    await waitForEmulators();\n    \n  } catch (error) {\n    console.error('Failed to start emulators:', error);\n    throw error;\n  }\n}\n\n/**\n * Wait for emulators to be ready\n */\nasync function waitForEmulators() {\n  const maxAttempts = 60;\n  const delay = 1000;\n  \n  for (let i = 0; i < maxAttempts; i++) {\n    try {\n      const [firestoreRes, authRes] = await Promise.all([\n        fetch('http://localhost:8080'),\n        fetch('http://localhost:9099')\n      ]);\n      \n      if (firestoreRes.ok && authRes.ok) {\n        console.log('✅ All emulators are ready!');\n        return;\n      }\n    } catch {\n      // Continue waiting\n    }\n    \n    if (i === 0) console.log('⏳ Waiting for emulators to start...');\n    await new Promise(resolve => setTimeout(resolve, delay));\n  }\n  \n  throw new Error('Emulators failed to start within timeout');\n}\n\n/**\n * Set up complete test environment\n */\nasync function setupTestEnvironment() {\n  console.log('📊 Setting up test data and permissions...');\n  \n  try {\n    // 1. Clear existing data (emulator only)\n    if (useEmulator) {\n      await clearEmulatorData();\n    }\n    \n    // 2. Set up Firebase security rules for testing\n    await setupFirebaseRules();\n    \n    // 3. Create test accounts\n    await createTestAccounts();\n    \n    // 4. Set up test data\n    await setupTestData();\n    \n    // 5. Create authentication states\n    await createAuthStates();\n    \n    console.log('✅ Test environment fully configured!');\n    \n  } catch (error) {\n    console.error('Test environment setup failed:', error);\n    throw error;\n  }\n}\n\n/**\n * Clear emulator data\n */\nasync function clearEmulatorData() {\n  try {\n    console.log('🧹 Clearing emulator data...');\n    \n    // Clear Firestore data\n    await fetch('http://localhost:8080/emulator/v1/projects/plan-e7bc6/databases/(default)/documents', {\n      method: 'DELETE'\n    });\n    \n    // Clear Auth data\n    await fetch('http://localhost:9099/emulator/v1/projects/plan-e7bc6/accounts', {\n      method: 'DELETE'\n    });\n    \n    console.log('✅ Emulator data cleared');\n  } catch (error) {\n    console.warn('Failed to clear emulator data:', error);\n  }\n}\n\n/**\n * Setup Firebase security rules for testing\n */\nasync function setupFirebaseRules() {\n  try {\n    console.log('🔒 Setting up Firebase security rules for testing...');\n    \n    if (useEmulator) {\n      // In emulator mode, deploy test-friendly rules\n      const testRules = `\nrules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    // Allow all operations for testing\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}\n`;\n      \n      // Write test rules to temporary file\n      fs.writeFileSync('.firestore.rules.test', testRules);\n      \n      // Apply test rules to emulator\n      try {\n        execSync('npx firebase deploy --only firestore:rules --project plan-e7bc6', {\n          stdio: 'pipe',\n          timeout: 30000\n        });\n        console.log('✅ Test security rules applied');\n      } catch (ruleError) {\n        console.warn('Failed to apply test rules, using default:', ruleError.message);\n      }\n      \n      // Clean up temporary file\n      if (fs.existsSync('.firestore.rules.test')) {\n        fs.unlinkSync('.firestore.rules.test');\n      }\n    }\n  } catch (error) {\n    console.warn('Security rules setup failed:', error);\n  }\n}\n\n/**\n * Create test user accounts\n */\nasync function createTestAccounts() {\n  console.log('👥 Creating test user accounts...');\n  \n  const testUsers = [\n    {\n      email: process.env.TEST_USER_EMAIL || 'dad@moonwave.test',\n      password: process.env.TEST_USER_PASSWORD || 'test123456',\n      displayName: '김아빠',\n      role: 'parent'\n    },\n    {\n      email: process.env.TEST_USER_2_EMAIL || 'mom@moonwave.test',\n      password: process.env.TEST_USER_2_PASSWORD || 'test123456',\n      displayName: '박엄마',\n      role: 'parent'\n    },\n    {\n      email: process.env.TEST_USER_3_EMAIL || 'suhyun@moonwave.test',\n      password: process.env.TEST_USER_3_PASSWORD || 'test123456',\n      displayName: '김수현',\n      role: 'child'\n    },\n    {\n      email: process.env.TEST_USER_4_EMAIL || 'dohyun@moonwave.test',\n      password: process.env.TEST_USER_4_PASSWORD || 'test123456',\n      displayName: '김도현',\n      role: 'child'\n    }\n  ];\n  \n  // Create test accounts via REST API (works with emulator)\n  for (const user of testUsers) {\n    try {\n      const createResponse = await fetch(`http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-key`, {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({\n          email: user.email,\n          password: user.password,\n          displayName: user.displayName,\n          returnSecureToken: true\n        })\n      });\n      \n      if (createResponse.ok) {\n        const userData = await createResponse.json();\n        console.log(`✅ Created test user: ${user.email}`);\n        \n        // Store user profile in Firestore\n        await fetch(`http://localhost:8080/v1/projects/plan-e7bc6/databases/(default)/documents/users/${userData.localId}`, {\n          method: 'PATCH',\n          headers: { 'Content-Type': 'application/json' },\n          body: JSON.stringify({\n            fields: {\n              email: { stringValue: user.email },\n              displayName: { stringValue: user.displayName },\n              role: { stringValue: user.role },\n              familyGroupId: { stringValue: process.env.TEST_FAMILY_GROUP_ID || 'family-kim-2024' },\n              createdAt: { timestampValue: new Date().toISOString() }\n            }\n          })\n        });\n        \n      } else {\n        const errorData = await createResponse.json();\n        if (errorData.error?.message?.includes('EMAIL_EXISTS')) {\n          console.log(`ℹ️ Test user already exists: ${user.email}`);\n        } else {\n          console.warn(`Failed to create user ${user.email}:`, errorData);\n        }\n      }\n    } catch (error) {\n      console.warn(`Error creating user ${user.email}:`, error);\n    }\n  }\n}\n\n/**\n * Set up test data\n */\nasync function setupTestData() {\n  console.log('📝 Setting up test tasks and family data...');\n  \n  try {\n    // Run the existing test data setup script\n    execSync('node scripts/setupTestData.js', {\n      stdio: 'inherit',\n      timeout: 60000,\n      env: { ...process.env, NODE_ENV: 'test' }\n    });\n    \n    console.log('✅ Test data setup completed');\n  } catch (error) {\n    console.warn('Test data setup failed, using minimal data:', error);\n  }\n}\n\n/**\n * Create authentication states for different test scenarios\n */\nasync function createAuthStates() {\n  console.log('🔑 Creating authentication states for testing...');\n  \n  const authStates = {\n    authenticated: {\n      email: process.env.TEST_USER_EMAIL || 'dad@moonwave.test',\n      password: process.env.TEST_USER_PASSWORD || 'test123456'\n    },\n    parentUser: {\n      email: process.env.TEST_USER_2_EMAIL || 'mom@moonwave.test',\n      password: process.env.TEST_USER_2_PASSWORD || 'test123456'\n    },\n    childUser: {\n      email: process.env.TEST_USER_3_EMAIL || 'suhyun@moonwave.test',\n      password: process.env.TEST_USER_3_PASSWORD || 'test123456'\n    }\n  };\n  \n  // Save auth state configurations\n  fs.writeFileSync('tests/auth-states.json', JSON.stringify(authStates, null, 2));\n  console.log('✅ Authentication states saved');\n}\n\nconsole.log('🎉 Moonwave Plan test environment is ready!');\nconsole.log('\\n📋 Next steps:');\nconsole.log('  1. Run: npm run test:e2e');\nconsole.log('  2. Or run specific tests: npx playwright test --headed');\nconsole.log('  3. View test results: npm run test:e2e:report');\nconsole.log('\\n🔗 Test URLs:');\nconsole.log('  • Application: http://localhost:3002');\nconsole.log('  • Firestore Emulator: http://localhost:8080');\nconsole.log('  • Auth Emulator: http://localhost:9099');\nconsole.log('\\n👥 Test Accounts:');\nconsole.log('  • dad@moonwave.test / test123456 (Parent)');\nconsole.log('  • mom@moonwave.test / test123456 (Parent)');\nconsole.log('  • suhyun@moonwave.test / test123456 (Child)');\nconsole.log('  • dohyun@moonwave.test / test123456 (Child)');
+import { execSync } from 'child_process';
+import dotenv from 'dotenv';
+import { initializeApp } from 'firebase/app';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
+import { connectStorageEmulator, getStorage } from 'firebase/storage';
+import fs from 'fs';
+
+dotenv.config({ path: '.env.test' });
+
+const isTestMode = process.env.NODE_ENV === 'test';
+const useEmulator = process.env.VITE_USE_FIREBASE_EMULATOR === 'true';
+
+const firebaseConfig = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
+};
+
+async function ensureEmulatorsRunning() {
+  try {
+    const res = await fetch('http://localhost:8080');
+    if (res.ok) return;
+  } catch (e) {
+    void e;
+  }
+  try {
+    execSync(
+      'npx firebase emulators:start --only auth,firestore,storage --detach',
+      {
+        stdio: 'ignore',
+        timeout: 60000,
+      }
+    );
+  } catch (e) {
+    void e;
+  }
+}
+
+async function waitFor(url, attempts = 30, delayMs = 1000) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return true;
+    } catch (e) {
+      void e;
+    }
+    await new Promise(r => setTimeout(r, delayMs));
+  }
+  return false;
+}
+
+async function setupFirebaseRules() {
+  if (!useEmulator) return;
+  const rules = `
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+`;
+  fs.writeFileSync('.firestore.rules.test', rules);
+  try {
+    execSync(
+      'npx firebase deploy --only firestore:rules --project plan-e7bc6',
+      {
+        stdio: 'ignore',
+        timeout: 30000,
+      }
+    );
+  } catch (e) {
+    void e;
+  }
+  if (fs.existsSync('.firestore.rules.test'))
+    fs.unlinkSync('.firestore.rules.test');
+}
+
+async function main() {
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  const storage = getStorage(app);
+
+  if (useEmulator && isTestMode) {
+    await ensureEmulatorsRunning();
+    await Promise.all([
+      waitFor('http://localhost:8080'),
+      waitFor('http://localhost:9099'),
+    ]);
+    try {
+      connectAuthEmulator(
+        auth,
+        process.env.VITE_FIREBASE_AUTH_EMULATOR_URL || 'http://localhost:9099'
+      );
+    } catch (e) {
+      void e;
+    }
+    try {
+      connectFirestoreEmulator(db, 'localhost', 8080);
+    } catch (e) {
+      void e;
+    }
+    try {
+      connectStorageEmulator(storage, 'localhost', 9199);
+    } catch (e) {
+      void e;
+    }
+  }
+
+  await setupFirebaseRules();
+}
+
+// Run only when invoked directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(e => {
+    console.error('Test environment setup failed:', e);
+    process.exit(1);
+  });
+}

@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Award,
   BarChart3,
-  Brain,
   Clock,
   TrendingUp,
   Trophy,
@@ -25,8 +24,7 @@ import {
   YAxis,
 } from 'recharts';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { WaveBackground } from '../components/layout/WaveBackground';
-import { useSettings } from '../components/settings/hooks/useSettings';
+import { useSettingsContext } from '../components/settings';
 import { StatisticsInsights } from '../components/statistics/StatisticsInsights';
 import { GlassCard } from '../components/ui/GlassCard';
 import { WaveButton } from '../components/ui/WaveButton';
@@ -34,6 +32,7 @@ import { Typography } from '../components/ui/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup, useUserGroups } from '../hooks/useGroup';
 import { useTasks } from '../hooks/useTasks';
+import logger from '../lib/logger';
 import { PointStats, pointsService } from '../lib/points';
 import { statisticsAnalyzer } from '../lib/statisticsAnalyzer';
 import { toDate } from '../utils/dateHelpers';
@@ -56,9 +55,7 @@ function StatisticsEnhanced() {
   const { user } = useAuth();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>('30days');
-  const [activeMetric, setActiveMetric] = useState<
-    'tasks' | 'groups' | 'personal'
-  >('tasks');
+  // 현재 미사용 상태 제거
 
   // Use real Firebase data
   const { groups, loading: groupsLoading } = useUserGroups();
@@ -69,20 +66,16 @@ function StatisticsEnhanced() {
     loading: groupLoading,
   } = useGroup({ groupId: selectedGroupId || undefined });
 
-  const {
-    tasks,
-    loading: tasksLoading,
-    stats,
-  } = useTasks({
+  const { tasks, loading: tasksLoading } = useTasks({
     realtime: true,
     groupId: selectedGroupId || undefined,
   });
 
-  const { settings, loading: settingsLoading } = useSettings();
+  const { loading: settingsLoading } = useSettingsContext();
 
   // 포인트 통계 상태
   const [pointStats, setPointStats] = useState<Record<string, PointStats>>({});
-  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [_loadingPoints, setLoadingPoints] = useState(false);
 
   // Set first group as selected if available
   useEffect(() => {
@@ -91,30 +84,28 @@ function StatisticsEnhanced() {
     }
   }, [groups, selectedGroupId]);
 
-  // 포인트 통계 로드
+  // 포인트 통계 로드 (그룹 단일 쿼리 활용)
   useEffect(() => {
     const loadPointStats = async () => {
-      if (!selectedGroupId || !members) return;
-      
+      if (!selectedGroupId) return;
+
       setLoadingPoints(true);
       try {
-        const stats: Record<string, PointStats> = {};
-        for (const member of members) {
-          const stat = await pointsService.getPointStats(member.userId, selectedGroupId);
-          if (stat) {
-            stats[member.userId] = stat;
-          }
+        const list = await pointsService.getGroupPointStats(selectedGroupId);
+        const map: Record<string, PointStats> = {};
+        for (const s of list) {
+          map[s.userId] = s;
         }
-        setPointStats(stats);
+        setPointStats(map);
       } catch (error) {
-        console.error('포인트 통계 로드 실패:', error);
+        logger.error('StatisticsEnhanced', '포인트 통계 로드 실패', error);
       } finally {
         setLoadingPoints(false);
       }
     };
 
     loadPointStats();
-  }, [selectedGroupId, members]);
+  }, [selectedGroupId]);
 
   // Enhanced task filtering with better date handling
   const { filteredTasks, periodData } = useMemo(() => {
@@ -166,9 +157,19 @@ function StatisticsEnhanced() {
         }),
         fullDate: date,
         total: dayTasks.length,
-        completed: dayTasks.filter(t => t.completed).length,
-        pending: dayTasks.filter(t => !t.completed && !t.isOverdue).length,
-        overdue: dayTasks.filter(t => t.isOverdue).length,
+        completed: dayTasks.filter(t => t.status === 'completed').length,
+        pending: dayTasks.filter(
+          t =>
+            t.status !== 'completed' &&
+            !!t.dueDate &&
+            toDate(t.dueDate) > toDate(t.createdAt)
+        ).length,
+        overdue: dayTasks.filter(
+          t =>
+            t.status !== 'completed' &&
+            !!t.dueDate &&
+            toDate(t.dueDate) < new Date()
+        ).length,
       });
     }
 
@@ -176,13 +177,10 @@ function StatisticsEnhanced() {
   }, [tasks, dateRange]);
 
   // Enhanced chart data with multiple metrics
-  const { categoryData, priorityData, statusData, memberData } = useMemo(() => {
+  const { categoryData } = useMemo(() => {
     if (!filteredTasks.length) {
       return {
         categoryData: [],
-        priorityData: [],
-        statusData: [],
-        memberData: [],
       };
     }
 
@@ -201,84 +199,14 @@ function StatisticsEnhanced() {
       })
     );
 
-    // Priority distribution
-    const priorities = filteredTasks.reduce((acc, task) => {
-      const priority = task.priority || 'medium';
-      acc[priority] = (acc[priority] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const priorityChart = Object.entries(priorities).map(
-      ([priority, count]) => ({
-        name:
-          priority === 'low'
-            ? '낮음'
-            : priority === 'medium'
-            ? '보통'
-            : priority === 'high'
-            ? '높음'
-            : '긴급',
-        value: count,
-        percentage: Math.round((count / filteredTasks.length) * 100),
-      })
-    );
-
-    // Status distribution
-    const completed = filteredTasks.filter(t => t.completed).length;
-    const overdue = filteredTasks.filter(t => t.isOverdue).length;
-    const pending = filteredTasks.length - completed - overdue;
-
-    const statusChart = [
-      {
-        name: '완료',
-        value: completed,
-        percentage: Math.round((completed / filteredTasks.length) * 100),
-      },
-      {
-        name: '진행 중',
-        value: pending,
-        percentage: Math.round((pending / filteredTasks.length) * 100),
-      },
-      {
-        name: '지연',
-        value: overdue,
-        percentage: Math.round((overdue / filteredTasks.length) * 100),
-      },
-    ].filter(item => item.value > 0);
-
-    // Member performance (if group selected)
-    const memberChart = members
-      ? members
-          .map(member => {
-            const memberTasks = filteredTasks.filter(
-              t => t.assigneeId === member.userId
-            );
-            const completedCount = memberTasks.filter(t => t.completed).length;
-
-            return {
-              name: member.userName || '이름 없음',
-              total: memberTasks.length,
-              completed: completedCount,
-              percentage:
-                memberTasks.length > 0
-                  ? Math.round((completedCount / memberTasks.length) * 100)
-                  : 0,
-            };
-          })
-          .filter(item => item.total > 0)
-      : [];
-
     return {
       categoryData: categoryChart,
-      priorityData: priorityChart,
-      statusData: statusChart,
-      memberData: memberChart,
     };
   }, [filteredTasks, members]);
 
   // Quick stats calculations
   const quickStats = useMemo(() => {
-    const today = new Date();
+    // 제거: today 미사용 변수
     const todayTasks = filteredTasks.filter(task => {
       const taskDate = toDate(task.createdAt);
       return isToday(taskDate);
@@ -289,16 +217,21 @@ function StatisticsEnhanced() {
       return isThisWeek(taskDate);
     });
 
-    const overdueTasks = filteredTasks.filter(task => task.isOverdue);
+    const overdueTasks = filteredTasks.filter(
+      task =>
+        task.status !== 'completed' &&
+        !!task.dueDate &&
+        toDate(task.dueDate) < new Date()
+    );
 
     return {
       todayTotal: todayTasks.length,
-      todayCompleted: todayTasks.filter(t => t.completed).length,
+      todayCompleted: todayTasks.filter(t => t.status === 'completed').length,
       weekTotal: thisWeekTasks.length,
-      weekCompleted: thisWeekTasks.filter(t => t.completed).length,
+      weekCompleted: thisWeekTasks.filter(t => t.status === 'completed').length,
       overdueCount: overdueTasks.length,
       totalPoints: filteredTasks.reduce(
-        (sum, task) => sum + (task.completed ? 10 : 0),
+        (sum, task) => sum + (task.status === 'completed' ? 10 : 0),
         0
       ),
     };
@@ -306,7 +239,9 @@ function StatisticsEnhanced() {
 
   const loading =
     groupsLoading || groupLoading || tasksLoading || settingsLoading;
-  const completedTasks = filteredTasks.filter(task => task.completed).length;
+  const completedTasks = filteredTasks.filter(
+    task => task.status === 'completed'
+  ).length;
   const completionRate =
     filteredTasks.length > 0
       ? Math.round((completedTasks / filteredTasks.length) * 100)
@@ -315,7 +250,6 @@ function StatisticsEnhanced() {
   if (loading) {
     return (
       <div className="min-h-screen">
-        <WaveBackground />
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <LoadingSpinner
             size="lg"
@@ -329,7 +263,6 @@ function StatisticsEnhanced() {
 
   return (
     <div className="min-h-screen">
-      <WaveBackground />
       <div className="relative z-10 p-4 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -608,7 +541,7 @@ function StatisticsEnhanced() {
                     dataKey="value"
                     label={({ name, percentage }) => `${name} ${percentage}%`}
                   >
-                    {categoryData.map((entry, index) => (
+                    {categoryData.map((_entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}

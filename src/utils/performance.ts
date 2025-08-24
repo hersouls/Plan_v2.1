@@ -1,40 +1,41 @@
 import { loadPerformance } from '../lib/firebase';
+import logger from '../lib/logger';
 
 export const measurePerformance = async (name: string) => {
   try {
     const performance = await loadPerformance();
     if (!performance) {
       if (import.meta.env.DEV) {
-        console.warn('Performance monitoring not available');
+        logger.warn('performance', 'monitoring not available');
       }
       return {
         start: () => {},
-        stop: () => {}
+        stop: () => {},
       };
     }
 
     const { trace } = await import('firebase/performance');
     const performanceTrace = trace(performance, name);
-    
+
     return {
       start: () => {
         performanceTrace.start();
         if (import.meta.env.DEV) {
-          console.log(`⏱️ Performance trace started: ${name}`);
+          logger.info('performance', `trace started: ${name}`);
         }
       },
       stop: () => {
         performanceTrace.stop();
         if (import.meta.env.DEV) {
-          console.log(`⏱️ Performance trace stopped: ${name}`);
+          logger.info('performance', `trace stopped: ${name}`);
         }
-      }
+      },
     };
   } catch (error) {
-    console.warn('Performance measurement error:', error);
+    logger.warn('performance', 'measurement error', error);
     return {
       start: () => {},
-      stop: () => {}
+      stop: () => {},
     };
   }
 };
@@ -63,7 +64,7 @@ export const getCoreWebVitals = () => {
       LCP: 0, // Largest Contentful Paint
       FID: 0, // First Input Delay
       CLS: 0, // Cumulative Layout Shift
-      TTFB: 0 // Time to First Byte
+      TTFB: 0, // Time to First Byte
     };
   }
   return null;

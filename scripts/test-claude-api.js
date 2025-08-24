@@ -5,8 +5,8 @@
  * Tests the Claude AI integration
  */
 
-import dotenv from 'dotenv';
 import Anthropic from '@anthropic-ai/sdk';
+import dotenv from 'dotenv';
 dotenv.config();
 
 async function testClaudeAPI() {
@@ -38,12 +38,15 @@ async function testClaudeAPI() {
   try {
     console.log('\n🧪 Testing basic API call...');
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 100,
-      messages: [{
-        role: 'user',
-        content: 'Hello! This is a test from Moonwave Plan app. Please respond with "API test successful!" and a brief greeting.'
-      }],
+      messages: [
+        {
+          role: 'user',
+          content:
+            'Hello! This is a test from Moonwave Plan app. Please respond with "API test successful!" and a brief greeting.',
+        },
+      ],
     });
 
     const content = response.content[0];
@@ -59,11 +62,12 @@ async function testClaudeAPI() {
   try {
     console.log('\n🎯 Testing task suggestion feature...');
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: `Generate 2 task suggestions for a family task management app based on "주말 집안일".
+      messages: [
+        {
+          role: 'user',
+          content: `Generate 2 task suggestions for a family task management app based on "주말 집안일".
         
         Return a JSON array of objects with this format:
         {
@@ -72,8 +76,9 @@ async function testClaudeAPI() {
           "category": "household|shopping|personal|work|health|education|entertainment|other",
           "priority": "low|medium|high",
           "estimatedMinutes": number
-        }`
-      }],
+        }`,
+        },
+      ],
     });
 
     const content = response.content[0];
@@ -82,10 +87,17 @@ async function testClaudeAPI() {
         const suggestions = JSON.parse(content.text);
         console.log('✅ Task suggestions generated:');
         suggestions.forEach((task, index) => {
-          console.log(`   ${index + 1}. ${task.title} (${task.category}, ${task.priority})`);
+          console.log(
+            `   ${index + 1}. ${task.title} (${task.category}, ${
+              task.priority
+            })`
+          );
         });
       } catch (parseError) {
-        console.log('✅ Response received (JSON parsing test):', content.text.substring(0, 100) + '...');
+        console.log(
+          '✅ Response received (JSON parsing test):',
+          content.text.substring(0, 100) + '...'
+        );
       }
     }
   } catch (error) {
@@ -96,17 +108,19 @@ async function testClaudeAPI() {
   try {
     console.log('\n📂 Testing task categorization...');
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 50,
-      messages: [{
-        role: 'user',
-        content: `Categorize this task into one of these categories: household, shopping, personal, work, health, education, entertainment, other.
+      messages: [
+        {
+          role: 'user',
+          content: `Categorize this task into one of these categories: household, shopping, personal, work, health, education, entertainment, other.
         
         Title: 방 청소하기
         Description: 침실과 거실 정리정돈
         
-        Return only the category name.`
-      }],
+        Return only the category name.`,
+        },
+      ],
     });
 
     const content = response.content[0];

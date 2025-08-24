@@ -7,7 +7,7 @@ export interface NavigationState {
   returnPath?: string;
   returnQuery?: Record<string, string>;
   returnFragment?: string;
-  contextData?: Record<string, any>;
+  contextData?: Record<string, unknown>;
 }
 
 export class NavigationCallback {
@@ -15,75 +15,75 @@ export class NavigationCallback {
    * 콜백 정보를 URL에 인코딩
    */
   static encodeCallback(
-    targetPath: string, 
+    targetPath: string,
     returnPath: string,
     options?: {
       query?: Record<string, string>;
       fragment?: string;
-      contextData?: Record<string, any>;
+      contextData?: Record<string, unknown>;
     }
   ): string {
     const url = new URL(targetPath, window.location.origin);
-    
+
     // 기본 리턴 패스
     url.searchParams.set('returnPath', returnPath);
-    
+
     // 쿼리 파라미터
     if (options?.query) {
       url.searchParams.set('returnQuery', JSON.stringify(options.query));
     }
-    
+
     // 프래그먼트
     if (options?.fragment) {
       url.searchParams.set('returnFragment', options.fragment);
     }
-    
+
     // 컨텍스트 데이터
     if (options?.contextData) {
       url.searchParams.set('contextData', JSON.stringify(options.contextData));
     }
-    
+
     return url.pathname + url.search;
   }
-  
+
   /**
    * URL에서 콜백 정보를 디코딩
    */
   static decodeCallback(searchParams: URLSearchParams): NavigationState | null {
     const returnPath = searchParams.get('returnPath');
     if (!returnPath) return null;
-    
+
     const state: NavigationState = { returnPath };
-    
+
     // 쿼리 파라미터 복원
     const returnQuery = searchParams.get('returnQuery');
     if (returnQuery) {
       try {
         state.returnQuery = JSON.parse(returnQuery);
-      } catch (e) {
-        console.warn('Failed to parse returnQuery:', e);
+      } catch {
+        // ignore invalid query
       }
     }
-    
+
     // 프래그먼트 복원
     const returnFragment = searchParams.get('returnFragment');
     if (returnFragment) {
       state.returnFragment = returnFragment;
     }
-    
+
     // 컨텍스트 데이터 복원
     const contextData = searchParams.get('contextData');
     if (contextData) {
       try {
         state.contextData = JSON.parse(contextData);
-      } catch (e) {
-        console.warn('Failed to parse contextData:', e);
+      } catch {
+        // ignore invalid context
       }
     }
-    
+
     return state;
   }
-  
+
   /**
    * 콜백을 실행하여 원래 위치로 이동
    */
@@ -95,8 +95,11 @@ export class NavigationCallback {
       scrollToElement?: string;
     }
   ): void {
-    let targetPath = state.returnPath!;
-    
+    if (!state.returnPath) {
+      return;
+    }
+    let targetPath = state.returnPath;
+
     // 쿼리 파라미터 추가
     if (state.returnQuery) {
       const url = new URL(targetPath, window.location.origin);
@@ -105,14 +108,14 @@ export class NavigationCallback {
       });
       targetPath = url.pathname + url.search;
     }
-    
+
     // 프래그먼트 추가
     if (state.returnFragment) {
       targetPath += '#' + state.returnFragment;
     }
-    
+
     navigate(targetPath);
-    
+
     // 히스토리 정리
     if (options?.cleanupHistory) {
       // 다음 틱에서 히스토리 정리 (페이지 이동 후)
@@ -122,7 +125,7 @@ export class NavigationCallback {
           const cleanUrl = targetPath.split('#')[0];
           window.history.replaceState(null, '', cleanUrl);
         }
-        
+
         // 특정 요소로 스크롤
         if (options?.scrollToElement) {
           const element = document.getElementById(options.scrollToElement);
@@ -133,7 +136,7 @@ export class NavigationCallback {
       }, 100);
     }
   }
-  
+
   /**
    * 현재 위치를 기반으로 콜백 URL 생성
    */
@@ -142,15 +145,15 @@ export class NavigationCallback {
     options?: {
       preserveQuery?: boolean;
       preserveFragment?: boolean;
-      contextData?: Record<string, any>;
+      contextData?: Record<string, unknown>;
     }
   ): string {
     const currentPath = window.location.pathname;
     const currentSearch = new URLSearchParams(window.location.search);
     const currentFragment = window.location.hash.substring(1);
-    
-    const callbackOptions: any = {};
-    
+
+    const callbackOptions: Record<string, unknown> = {};
+
     // 현재 쿼리 파라미터 보존
     if (options?.preserveQuery && currentSearch.toString()) {
       const queryObj: Record<string, string> = {};
@@ -164,20 +167,20 @@ export class NavigationCallback {
         callbackOptions.query = queryObj;
       }
     }
-    
+
     // 현재 프래그먼트 보존
     if (options?.preserveFragment && currentFragment) {
       callbackOptions.fragment = currentFragment;
     }
-    
+
     // 컨텍스트 데이터 추가
     if (options?.contextData) {
       callbackOptions.contextData = options.contextData;
     }
-    
+
     return this.encodeCallback(targetPath, currentPath, callbackOptions);
   }
-  
+
   /**
    * 스마트 뒤로가기 - 콜백이 있으면 콜백 실행, 없으면 기본 뒤로가기
    */
@@ -187,7 +190,7 @@ export class NavigationCallback {
     fallbackPath: string = '/'
   ): void {
     const callbackState = this.decodeCallback(searchParams);
-    
+
     if (callbackState) {
       this.executeCallback(navigate, callbackState, { cleanupHistory: true });
     } else if (window.history.length > 1) {
@@ -211,7 +214,7 @@ export class NavigationCallback {
   ): void {
     const delay = options?.delay ?? 3000;
     const fallbackPath = options?.fallbackPath ?? '/';
-    
+
     setTimeout(() => {
       if (options?.preserveErrorState) {
         // 에러 상태를 유지하면서 콜백 실행 (에러 메시지가 새 페이지에서도 보이도록)
@@ -219,9 +222,11 @@ export class NavigationCallback {
         if (callbackState && callbackState.returnQuery) {
           callbackState.returnQuery.error = 'operation_failed';
         }
-        
+
         if (callbackState) {
-          this.executeCallback(navigate, callbackState, { cleanupHistory: true });
+          this.executeCallback(navigate, callbackState, {
+            cleanupHistory: true,
+          });
         } else {
           navigate(fallbackPath + '?error=operation_failed');
         }
@@ -237,13 +242,15 @@ export class NavigationCallback {
  */
 export const useNavigationCallback = (searchParams: URLSearchParams) => {
   const callbackState = NavigationCallback.decodeCallback(searchParams);
-  
+
   return {
     hasCallback: !!callbackState,
     callbackState,
     executeCallback: (navigate: (path: string) => void) => {
       if (callbackState) {
-        NavigationCallback.executeCallback(navigate, callbackState, { cleanupHistory: true });
+        NavigationCallback.executeCallback(navigate, callbackState, {
+          cleanupHistory: true,
+        });
       }
     },
     smartGoBack: (navigate: (path: string) => void, fallbackPath?: string) => {
@@ -257,8 +264,12 @@ export const useNavigationCallback = (searchParams: URLSearchParams) => {
         preserveErrorState?: boolean;
       }
     ) => {
-      NavigationCallback.handleErrorWithCallback(navigate, searchParams, options);
-    }
+      NavigationCallback.handleErrorWithCallback(
+        navigate,
+        searchParams,
+        options
+      );
+    },
   };
 };
 
@@ -269,14 +280,18 @@ export class DayNavigationCallback extends NavigationCallback {
   /**
    * Day 정보를 포함한 콜백 URL 생성
    */
-  static createDayCallback(targetPath: string, tripId: string, selectedDay: number): string {
+  static createDayCallback(
+    targetPath: string,
+    tripId: string,
+    selectedDay: number
+  ): string {
     const returnPath = `/trips/${tripId}`;
     return this.encodeCallback(targetPath, returnPath, {
       fragment: `day-${selectedDay}`,
-      contextData: { selectedDay, tripId }
+      contextData: { selectedDay, tripId },
     });
   }
-  
+
   /**
    * Day 콜백을 실행하고 특정 Day 탭을 선택
    */
@@ -286,7 +301,9 @@ export class DayNavigationCallback extends NavigationCallback {
   ): void {
     this.executeCallback(navigate, state, {
       cleanupHistory: true,
-      scrollToElement: state.contextData?.selectedDay ? `day-tab-${state.contextData.selectedDay}` : undefined
+      scrollToElement: state.contextData?.selectedDay
+        ? `day-tab-${state.contextData.selectedDay}`
+        : undefined,
     });
   }
 }

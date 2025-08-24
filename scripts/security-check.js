@@ -16,8 +16,8 @@ const projectRoot = path.resolve(__dirname, '..')
 console.log('🔒 Moonwave Plan Security Check')
 console.log('===============================')
 
-let securityIssues = []
-let securityPassed = []
+const securityIssues = []
+const securityPassed = []
 
 // Check Firestore Security Rules
 function validateFirestoreRules() {

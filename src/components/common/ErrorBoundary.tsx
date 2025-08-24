@@ -1,7 +1,8 @@
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/utils';
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -27,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary', 'caught error', error, errorInfo);
     this.setState({
       error,
       errorInfo,
@@ -76,7 +77,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 </p>
               </div>
 
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <details className="w-full text-left">
                   <summary
                     className="cursor-pointer text-sm"
@@ -134,23 +135,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-export const withErrorBoundary = <P extends object>(
-  Component: React.ComponentType<P>,
-  fallback?: ReactNode,
-  onReset?: () => void
-) => {
-  const WrappedComponent = (props: P) => (
-    <ErrorBoundary fallback={fallback} onReset={onReset}>
-      <Component {...props} />
-    </ErrorBoundary>
-  );
-
-  WrappedComponent.displayName = `withErrorBoundary(${
-    Component.displayName || Component.name
-  })`;
-
-  return WrappedComponent;
-};
+// moved to separate helper to satisfy react-refresh rule
+// withErrorBoundary HOC는 별도 파일로 이동: see ErrorBoundary.helpers.tsx
 
 // Export the main ErrorBoundary as default
 export { ErrorBoundary as default };

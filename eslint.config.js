@@ -1,11 +1,25 @@
 import js from '@eslint/js';
-import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'build', 'coverage', 'node_modules', '*.min.js', '*.d.ts'] },
+  {
+    ignores: [
+      'dist',
+      'build',
+      'coverage',
+      'node_modules',
+      '*.min.js',
+      '*.d.ts',
+      // Exclude generated/externals
+      'functions/lib/**',
+      '_shared_upload/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -32,7 +46,10 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
@@ -44,13 +61,36 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
+    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'no-useless-escape': 'off',
     },
   },
   {
-    files: ['scripts/**/*.js', '*.config.{js,cjs,mjs}', 'firebase-migration.js'],
+    files: ['src/types/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
+  {
+    files: ['functions/src/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
+    files: [
+      'scripts/**/*.js',
+      'scripts/**/*.cjs',
+      '*.config.{js,cjs,mjs}',
+      'firebase-migration.js',
+    ],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -63,6 +103,10 @@ export default tseslint.config(
       'no-restricted-syntax': 'off',
       'no-console': 'off',
       'no-prototype-builtins': 'off',
+      // Allow CommonJS style in scripts
+      '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-var-requires': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {

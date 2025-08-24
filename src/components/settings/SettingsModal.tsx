@@ -1,6 +1,7 @@
+import logger from '@/lib/logger';
+import { LogOut, Plane, X } from 'lucide-react';
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { X, Plane, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigationCallback } from '../../utils/navigationCallback';
 import { GlassCard } from '../ui/GlassCard';
@@ -13,12 +14,12 @@ interface SettingsModalProps extends Omit<SettingsContainerProps, 'mode'> {
   title?: string;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen = true, 
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen = true,
   onClose,
   enableCallback = false,
   initialTab = 'profile',
-  title = '설정'
+  title = '설정',
 }) => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       await signOut();
       if (onClose) onClose();
-      
+
       // 콜백이 활성화된 경우 스마트 뒤로가기, 아니면 로그인으로
       if (enableCallback) {
         smartGoBack(navigate, '/login');
@@ -57,7 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         navigate('/login');
       }
     } catch (error) {
-      console.error('Logout failed:', error);
+      logger.error('settings', 'Logout failed', error);
       alert('로그아웃에 실패했습니다.');
     }
   };
@@ -80,12 +81,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <GlassCard 
-        variant="strong" 
+      <GlassCard
+        variant="strong"
         className="w-full max-w-5xl max-h-[90vh] overflow-hidden"
       >
         {/* Header */}
@@ -98,7 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {title}
             </h1>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             {/* 로그아웃 버튼 */}
             <WaveButton
@@ -110,7 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <LogOut size={16} />
               <span className="hidden sm:inline ml-1">로그아웃</span>
             </WaveButton>
-            
+
             {/* 닫기 버튼 */}
             {(onClose || enableCallback) && (
               <button

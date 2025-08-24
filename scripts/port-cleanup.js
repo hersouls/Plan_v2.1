@@ -9,7 +9,7 @@ console.log('🔍 3005 포트 점유 프로세스 확인 중...');
 async function cleanupPort() {
   try {
     let command;
-    let pids = [];
+    const pids = [];
 
     if (os.platform() === 'win32') {
       // Windows

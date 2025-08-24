@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
+import logger from '@/lib/logger';
 import {
   Timestamp,
   addDoc,
@@ -30,7 +31,7 @@ export interface Activity {
   userAvatar?: string;
   targetUserId?: string; // For assignments
   targetUserName?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: Timestamp;
 }
 
@@ -40,7 +41,7 @@ export interface CreateActivityInput {
   groupId: string;
   targetUserId?: string;
   targetUserName?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UseActivityOptions {
@@ -131,7 +132,7 @@ export const useActivity = (
             setLoading(false);
           },
           err => {
-            console.error('Activities subscription error:', err);
+            logger.error('useActivity', 'subscription error', err);
             setError('활동 정보를 불러오는 중 오류가 발생했습니다.');
             setLoading(false);
           }
@@ -140,7 +141,7 @@ export const useActivity = (
         return unsubscribe;
       }
     } catch (err) {
-      console.error('Fetch activities error:', err);
+      logger.error('useActivity', 'fetch activities failed', err);
       setError('활동 정보를 불러오는 중 오류가 발생했습니다.');
       setLoading(false);
     }
@@ -161,7 +162,7 @@ export const useActivity = (
 
         await addDoc(collection(db, 'activities'), activityDoc);
       } catch (err) {
-        console.error('Log activity error:', err);
+        logger.error('useActivity', 'logActivity failed', err);
         // Don't throw error to prevent disrupting main functionality
       }
     },
@@ -227,7 +228,7 @@ export const usePresence = (groupId: string): UsePresenceReturn => {
 
         await addDoc(collection(db, 'presence'), presenceDoc);
       } catch (err) {
-        console.error('Update presence error:', err);
+        logger.error('useActivity', 'updatePresence failed', err);
       }
     },
     [user, groupId]

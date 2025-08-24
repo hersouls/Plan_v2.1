@@ -11,10 +11,7 @@
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
     "src/**/__tests__/**/*",
     "src/**/*.test.ts",
@@ -24,7 +21,6 @@
     "src/utils/seed-data.ts",
     "src/lib/migration.ts",
     "src/utils/db-operations.ts",
-    // Exclude any legacy files that may have type issues
-    "src/**/*.d.ts"
+    "src/pages/PointsManagement.refactored.tsx"
   ]
 }

@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+import logger from '@/lib/logger';
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import * as firestoreServices from '../lib/firestore';
 import { FamilyGroup } from '../types/group';
@@ -340,7 +342,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           !firestoreServices.groupService ||
           typeof firestoreServices.groupService.getUserGroups !== 'function'
         ) {
-          console.error('groupService or getUserGroups method not available');
+          logger.error('app', 'groupService or getUserGroups not available');
           throw new Error('groupService is not properly loaded');
         }
 
@@ -357,7 +359,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           });
         }
       } catch (error) {
-        console.error('Error loading default group:', error);
+        logger.error('app', 'Error loading default group', error);
         dispatch({
           type: 'SET_ERROR',
           payload: {

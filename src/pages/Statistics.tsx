@@ -1,7 +1,7 @@
 import { format, startOfWeek, subDays } from 'date-fns';
-import { Award, Clock, Star, Trophy, Users, Zap, Brain } from 'lucide-react';
+import { Award, Clock, Star, Trophy, Users, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+//
 import {
   Bar,
   BarChart,
@@ -15,16 +15,16 @@ import {
   YAxis,
 } from 'recharts';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { WaveBackground } from '../components/layout/WaveBackground';
 import { StatisticsInsights } from '../components/statistics/StatisticsInsights';
 import { GlassCard } from '../components/ui/GlassCard';
-import { AvatarWrapper, getAvatarInitials } from '../components/ui/avatar';
+import { AvatarWrapper } from '../components/ui/avatar';
+import getAvatarInitials from '../components/ui/avatar.utils';
 import { Typography } from '../components/ui/typography';
-import { WaveButton } from '../components/ui/WaveButton';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup, useUserGroups } from '../hooks/useGroup';
 import { useTasks } from '../hooks/useTasks';
 import { FilterUtils } from '../lib/design-tokens';
+import { logger } from '../lib/logger';
 import { PointStats, pointsService } from '../lib/points';
 import { statisticsAnalyzer } from '../lib/statisticsAnalyzer';
 import { toDate } from '../utils/dateHelpers';
@@ -41,7 +41,7 @@ const COLORS = [
 ];
 
 function Statistics() {
-  const navigate = useNavigate();
+  //
   const { user } = useAuth();
   const { groups } = useUserGroups();
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -56,20 +56,22 @@ function Statistics() {
   const {
     group,
     members,
-    stats: groupStats,
     loading: groupLoading,
   } = useGroup({
     groupId: selectedGroupId || undefined,
   });
   const [dateRange, setDateRange] = useState<DateRange>('30days');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // 포인트 통계 상태
   const [pointStats, setPointStats] = useState<Record<string, PointStats>>({});
-  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [loadingPoints, setLoadingPoints] = useState<boolean>(false);
+  //
 
   // 사용자 프로필 정보 상태
   const [userProfiles, setUserProfiles] = useState<Record<string, any>>({});
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
+  //
 
   // 즐겨찾기 그룹 관리
   const [favoriteGroups, setFavoriteGroups] = useState<string[]>([]);
@@ -81,7 +83,7 @@ function Statistics() {
       try {
         setFavoriteGroups(JSON.parse(savedFavorites));
       } catch {
-        console.error('Failed to parse favorite groups');
+        logger.error('statistics', 'Failed to parse favorite groups');
         setFavoriteGroups([]);
       }
     }
@@ -129,7 +131,6 @@ function Statistics() {
     if (!members || members.length === 0) return;
 
     const loadUserProfiles = async () => {
-      setLoadingProfiles(true);
       try {
         const { enhancedUserService } = await import(
           '../lib/firestore-improved'
@@ -144,16 +145,16 @@ function Statistics() {
             if (profile) {
               profiles[member.userId] = profile;
             }
-          } catch (error) {
-            console.error(`사용자 프로필 로드 실패 (${member.userId}):`, error);
+          } catch {
+            // noop
           }
         }
 
         setUserProfiles(profiles);
-      } catch (error) {
-        console.error('사용자 프로필 로드 실패:', error);
+      } catch (_error) {
+        logger.error('statistics', '사용자 프로필 로드 실패', _error);
       } finally {
-        setLoadingProfiles(false);
+        // no-op
       }
     };
 
@@ -175,7 +176,11 @@ function Statistics() {
             );
             return { userId: member.userId, stats };
           } catch (error) {
-            console.error(`포인트 통계 로드 실패 (${member.userId}):`, error);
+            logger.error(
+              'statistics',
+              `포인트 통계 로드 실패 (${member.userId})`,
+              error
+            );
             return { userId: member.userId, stats: null };
           }
         });
@@ -189,8 +194,8 @@ function Statistics() {
         }, {} as Record<string, PointStats>);
 
         setPointStats(statsMap);
-      } catch (error) {
-        console.error('포인트 통계 로드 실패:', error);
+      } catch (_error) {
+        logger.error('statistics', '포인트 통계 로드 실패', _error);
       } finally {
         setLoadingPoints(false);
       }
@@ -201,9 +206,14 @@ function Statistics() {
 
   const loading = tasksLoading || groupLoading;
 
-  // Generate chart data from real tasks
+  // Generate chart data from real tasks (구성원 필터 반영)
   const chartData = useMemo(() => {
-    if (!tasks || tasks.length === 0) {
+    const filteredTasks =
+      selectedMemberId === 'ALL'
+        ? tasks || []
+        : (tasks || []).filter(t => t.assigneeId === selectedMemberId);
+
+    if (!filteredTasks || filteredTasks.length === 0) {
       // Return empty data structure
       return {
         dailyData: [],
@@ -228,13 +238,13 @@ function Statistics() {
       const date = subDays(now, days - 1 - i);
       const dateStr = format(date, 'yyyy-MM-dd');
 
-      const dayTasks = tasks.filter(task => {
+      const dayTasks = filteredTasks.filter(task => {
         if (!task.createdAt) return false;
         try {
           const taskDate = format(toDate(task.createdAt), 'yyyy-MM-dd');
           return taskDate === dateStr;
-        } catch (error) {
-          console.warn('Invalid createdAt date:', task.createdAt);
+        } catch {
+          logger.warn('statistics', 'Invalid createdAt date', task.createdAt);
           return false;
         }
       });
@@ -244,8 +254,12 @@ function Statistics() {
         try {
           const completedDate = format(toDate(task.completedAt), 'yyyy-MM-dd');
           return completedDate === dateStr;
-        } catch (error) {
-          console.warn('Invalid completedAt date:', task.completedAt);
+        } catch {
+          logger.warn(
+            'statistics',
+            'Invalid completedAt date',
+            task.completedAt
+          );
           return false;
         }
       });
@@ -259,7 +273,7 @@ function Statistics() {
     });
 
     // Category distribution from real tasks
-    const categoryCount = tasks.reduce((acc, task) => {
+    const categoryCount = filteredTasks.reduce((acc, task) => {
       const category = task.category || '기타';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
@@ -277,7 +291,7 @@ function Statistics() {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
 
-      const weekTasks = tasks.filter(task => {
+      const weekTasks = filteredTasks.filter(task => {
         if (!task.createdAt) return false;
         const taskDate = toDate(task.createdAt);
         return taskDate >= weekStart && taskDate <= weekEnd;
@@ -297,7 +311,7 @@ function Statistics() {
     // Member performance from real data
     const memberData =
       members?.map(member => {
-        const memberTasks = tasks.filter(
+        const memberTasks = (tasks || []).filter(
           task => task.assigneeId === member.userId
         );
         const completedTasks = memberTasks.filter(
@@ -317,7 +331,7 @@ function Statistics() {
       }) || [];
 
     return { dailyData, categoryData, weeklyData, memberData };
-  }, [dateRange, tasks, members]);
+  }, [dateRange, tasks, members, selectedMemberId]);
 
   const dateRangeOptions = FilterUtils.getDateRangeFilterOptions().map(
     option => ({
@@ -426,8 +440,7 @@ function Statistics() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <LoadingSpinner size="lg" text="통계를 불러오는 중..." />
         </div>
@@ -436,9 +449,7 @@ function Statistics() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-      <WaveBackground />
-
+    <div className="min-h-screen">
       <div
         className="relative z-10 max-w-7xl mx-auto responsive-px responsive-py fixed-header-spacing"
         style={{ paddingTop: '120px' }}
@@ -575,7 +586,10 @@ function Statistics() {
           <GlassCard variant="light" className="p-4 lg:p-6 text-center">
             <div className="text-2xl lg:text-3xl font-bold text-orange-400 mb-2 font-pretendard">
               {!loadingPoints && Object.keys(pointStats).length > 0
-                ? Object.values(pointStats).reduce((sum, stat) => sum + stat.totalPoints, 0)
+                ? Object.values(pointStats).reduce(
+                    (sum, stat) => sum + stat.totalPoints,
+                    0
+                  )
                 : 0}
             </div>
             <div className="text-white/80 text-sm lg:text-base font-pretendard">
@@ -648,7 +662,7 @@ function Statistics() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {chartData.categoryData.map((entry, index) => (
+                    {chartData.categoryData.map((_entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -795,7 +809,10 @@ function Statistics() {
                 </h4>
                 <div className="text-2xl lg:text-3xl font-bold text-orange-400 mb-2 font-pretendard">
                   {!loadingPoints && Object.keys(pointStats).length > 0
-                    ? Object.values(pointStats).reduce((sum, stat) => sum + stat.totalPoints, 0)
+                    ? Object.values(pointStats).reduce(
+                        (sum, stat) => sum + stat.totalPoints,
+                        0
+                      )
                     : 0}
                 </div>
                 <div className="text-white/70 text-sm lg:text-base font-pretendard">
@@ -860,11 +877,10 @@ function Statistics() {
                         // If it's already a Date object or string
                         return new Date(task.dueDate as any) < new Date();
                       } catch (error) {
-                        console.warn(
-                          'Invalid dueDate format:',
-                          task.dueDate,
-                          error
-                        );
+                        logger.warn('Statistics', 'Invalid dueDate format', {
+                          dueDate: task.dueDate,
+                          error,
+                        });
                         return false;
                       }
                     });
@@ -923,7 +939,8 @@ function Statistics() {
                         </td>
                         <td className="py-3 text-center">
                           <span className="text-lg font-bold text-orange-400 font-pretendard">
-                            {pointStats[memberInfo?.userId || '']?.totalPoints || 0}
+                            {pointStats[memberInfo?.userId || '']
+                              ?.totalPoints || 0}
                           </span>
                         </td>
                         <td className="py-3 text-center text-white/70 text-sm font-pretendard">
@@ -1093,7 +1110,7 @@ function Statistics() {
         )}
 
         {/* Achievements */}
-        <GlassCard variant="light" className="p-6 lg:p-8">
+        <GlassCard variant="light" className="p-6 lg:p-8 mb-8">
           <h3 className="text-lg lg:text-xl font-semibold text-white mb-6 font-pretendard tracking-ko-tight">
             업적
           </h3>

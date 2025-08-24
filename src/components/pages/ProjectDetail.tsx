@@ -9,7 +9,7 @@ interface ProjectData {
   name: string;
   url: string;
   description: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string; size?: number | string }>;
   color: string;
   longDescription: string;
   features: string[];

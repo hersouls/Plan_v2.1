@@ -88,7 +88,7 @@ test.describe('Dashboard Features', () => {
       
       // Should open quick add modal or navigate to task creation
       const isModal = await page.locator('[role="dialog"], .modal, [data-testid="quick-add-modal"]').isVisible()
-      const isTaskCreate = page.url().includes('/task/create')
+      const isTaskCreate = page.url().includes('/tasks/create')
       
       expect(isModal || isTaskCreate).toBeTruthy()
     })

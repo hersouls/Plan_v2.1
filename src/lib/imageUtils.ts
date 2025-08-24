@@ -1,3 +1,4 @@
+import logger from '@/lib/logger';
 /**
  * 이미지 리사이징 및 압축 유틸리티
  */
@@ -33,7 +34,7 @@ export function resizeImage(
       const { width: originalWidth, height: originalHeight } = img;
 
       // 새로운 크기 계산 (비율 유지)
-      let { width: newWidth, height: newHeight } = calculateNewSize(
+      const { width: newWidth, height: newHeight } = calculateNewSize(
         originalWidth,
         originalHeight,
         maxWidth,
@@ -142,13 +143,11 @@ export function getImageInfo(file: File): Promise<{
  * 아바타 이미지 최적화 (파일 용량 제한 없음, 자동 리사이징)
  */
 export async function optimizeAvatarImage(file: File): Promise<File> {
-  const MAX_DIMENSION = 2048; // 최대 해상도
-  const QUALITY = 0.9; // 고품질 유지
-
   const fileSizeMB = getFileSizeInMB(file);
 
   // 파일 크기 제한 없이 원본 반환
-  console.log(
+  logger.info(
+    'image',
     `아바타 이미지 크기: ${fileSizeMB.toFixed(2)}MB (용량 제한 없음)`
   );
 
@@ -167,7 +166,8 @@ export async function optimizeImage(file: File): Promise<File> {
   const fileSizeMB = getFileSizeInMB(file);
 
   if (fileSizeMB > MAX_SIZE_MB) {
-    console.log(
+    logger.warn(
+      'image',
       `이미지 크기가 ${fileSizeMB.toFixed(
         2
       )}MB로 100MB를 초과합니다. 자동으로 크기를 조정합니다.`
@@ -183,10 +183,10 @@ export async function optimizeImage(file: File): Promise<File> {
     try {
       const resizedFile = await resizeImage(file, options);
       const newSize = getFileSizeInMB(resizedFile);
-      console.log(`리사이징 후 크기: ${newSize.toFixed(2)}MB`);
+      logger.info('image', `리사이징 후 크기: ${newSize.toFixed(2)}MB`);
       return resizedFile;
     } catch (error) {
-      console.error('이미지 리사이징 실패:', error);
+      logger.error('image', '이미지 리사이징 실패', error);
       throw new Error('이미지 크기 조정에 실패했습니다.');
     }
   }

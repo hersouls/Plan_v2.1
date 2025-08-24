@@ -1,17 +1,46 @@
 // 웹 앱에서 실행할 수 있는 seed 데이터 생성 유틸리티
-import { collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  serverTimestamp,
+  writeBatch,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Plan } from '../types/plan';
+
+// Seed 전용 Plan 형태 (Firestore 컬렉션 구조에 맞춘 경량 타입)
+interface SeedPlan {
+  day: number;
+  place_name: string;
+  type: string;
+  start_time: string;
+  map_url?: string;
+}
 
 // Plan 데이터 (일부만 포함)
-const plansByDay: Record<number, Omit<Plan, 'id' | 'trip_id' | 'created_at' | 'updated_at'>[]> = {
-  1: [ // Day 1: 2025-10-05
+const plansByDay: Record<number, SeedPlan[]> = {
+  1: [
+    // Day 1: 2025-10-05
     { day: 1, place_name: '집 출발', type: 'transport', start_time: '14:00' },
     { day: 1, place_name: '발권', type: 'transport', start_time: '14:30' },
     { day: 1, place_name: '라운지', type: 'restaurant', start_time: '15:00' },
-    { day: 1, place_name: '인천국제공항 T1 출발 (에어캐나다)', type: 'transport', start_time: '19:05' },
-    { day: 1, place_name: '토론토(YYZ) 도착', type: 'transport', start_time: '19:30' },
-    { day: 1, place_name: '렌트카 체크인', type: 'transport', start_time: '20:30' },
+    {
+      day: 1,
+      place_name: '인천국제공항 T1 출발 (에어캐나다)',
+      type: 'transport',
+      start_time: '19:05',
+    },
+    {
+      day: 1,
+      place_name: '토론토(YYZ) 도착',
+      type: 'transport',
+      start_time: '19:30',
+    },
+    {
+      day: 1,
+      place_name: '렌트카 체크인',
+      type: 'transport',
+      start_time: '20:30',
+    },
     {
       day: 1,
       place_name: 'Courtyard by Marriott Toronto Airport (체크인)',
@@ -21,8 +50,14 @@ const plansByDay: Record<number, Omit<Plan, 'id' | 'trip_id' | 'created_at' | 'u
     },
   ],
 
-  2: [ // Day 2: 2025-10-06
-    { day: 2, place_name: '호텔 조식', type: 'restaurant', start_time: '07:00' },
+  2: [
+    // Day 2: 2025-10-06
+    {
+      day: 2,
+      place_name: '호텔 조식',
+      type: 'restaurant',
+      start_time: '07:00',
+    },
     { day: 2, place_name: '호텔 체크아웃', type: 'hotel', start_time: '08:00' },
     {
       day: 2,
@@ -80,12 +115,28 @@ const plansByDay: Record<number, Omit<Plan, 'id' | 'trip_id' | 'created_at' | 'u
       start_time: '18:00',
       map_url: 'https://maps.app.goo.gl/CJpgAaXoB8A9R1jM6',
     },
-    { day: 2, place_name: '클럽 라운지 (시간 확인 필요)', type: 'restaurant', start_time: '19:00' },
+    {
+      day: 2,
+      place_name: '클럽 라운지 (시간 확인 필요)',
+      type: 'restaurant',
+      start_time: '19:00',
+    },
   ],
 
-  3: [ // Day 3: 2025-10-07
-    { day: 3, place_name: '호텔 조식', type: 'restaurant', start_time: '08:00' },
-    { day: 3, place_name: '이동: 오타와 (약 4시간)', type: 'transport', start_time: '08:30' },
+  3: [
+    // Day 3: 2025-10-07
+    {
+      day: 3,
+      place_name: '호텔 조식',
+      type: 'restaurant',
+      start_time: '08:00',
+    },
+    {
+      day: 3,
+      place_name: '이동: 오타와 (약 4시간)',
+      type: 'transport',
+      start_time: '08:30',
+    },
     {
       day: 3,
       place_name: 'Parliament Hill (캐나다 연방의회)',
@@ -135,7 +186,12 @@ const plansByDay: Record<number, Omit<Plan, 'id' | 'trip_id' | 'created_at' | 'u
       start_time: '16:00',
       map_url: 'https://maps.app.goo.gl/B2FUnvHVrTsjoZgz8',
     },
-    { day: 3, place_name: '라운지 식사 (시간 확인 필요)', type: 'restaurant', start_time: '18:30' },
+    {
+      day: 3,
+      place_name: '라운지 식사 (시간 확인 필요)',
+      type: 'restaurant',
+      start_time: '18:30',
+    },
   ],
 };
 
@@ -143,8 +199,8 @@ export async function seedPlansForTrip(tripId: string) {
   try {
     for (const [day, plans] of Object.entries(plansByDay)) {
       const batch = writeBatch(db);
-      
-      plans.forEach((planData) => {
+
+      plans.forEach(planData => {
         const planRef = doc(collection(db, 'plans'));
         const planWithMetadata = {
           ...planData,
@@ -155,11 +211,11 @@ export async function seedPlansForTrip(tripId: string) {
         };
         batch.set(planRef, planWithMetadata);
       });
-      
+
       await batch.commit();
       console.log(`✅ Day ${day}: ${plans.length}개 일정 등록 완료`);
     }
-    
+
     console.log('🎉 모든 일정 등록 완료!');
     return true;
   } catch (error) {

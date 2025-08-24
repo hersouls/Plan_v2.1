@@ -6,30 +6,30 @@ export interface Group {
   name: string;
   description?: string;
   avatar?: string;
-  ownerId: string;              // Group owner
-  
+  ownerId: string; // Group owner
+
   // Member management - Use EITHER memberIds OR members subcollection
-  memberIds: string[];          // Simple array for queries
+  memberIds: string[]; // Simple array for queries
   memberRoles: Record<string, MemberRole>; // userId -> role mapping
-  
+
   settings: {
     allowMembersToInvite: boolean;
     requireApprovalForNewMembers: boolean;
     defaultRole: MemberRole;
-    taskCategories: string[];   // Custom categories
-    taskTags: string[];        // Custom tags
+    taskCategories: string[]; // Custom categories
+    taskTags: string[]; // Custom tags
     theme?: {
       primaryColor?: string;
       accentColor?: string;
     };
   };
-  
+
   subscription?: {
     plan: 'free' | 'premium' | 'enterprise';
     validUntil?: Timestamp;
     maxMembers: number;
   };
-  
+
   statistics: {
     totalTasks: number;
     completedTasks: number;
@@ -37,10 +37,10 @@ export interface Group {
     lastActivityAt: Timestamp;
     activeMembersCount: number;
   };
-  
+
   isPublic: boolean;
-  tags: string[];               // Public group tags
-  
+  tags: string[]; // Public group tags
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -55,8 +55,10 @@ export interface GroupMember {
   lastActivityAt?: Timestamp;
   // Compatibility aliases
   lastActive?: Timestamp;
+  displayName?: string;
   userName?: string;
   userEmail?: string;
+  avatar?: string;
   userAvatar?: string;
   notifications?: {
     muted: boolean;
@@ -74,16 +76,16 @@ export interface GroupInvite {
   groupName: string;
   invitedBy: string;
   invitedEmail?: string;
-  inviteCode: string;           // Public invite code
+  inviteCode: string; // Public invite code
   role: MemberRole;
-  
+
   status: 'pending' | 'accepted' | 'expired' | 'revoked';
   message?: string;
-  
+
   acceptedBy?: string;
   acceptedAt?: Timestamp;
   expiresAt: Timestamp;
-  
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -110,26 +112,26 @@ export interface UpdateGroupInput {
 export interface GroupStats {
   groupId: string;
   period: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
-  
+
   tasks: {
     created: number;
     completed: number;
     inProgress: number;
     overdue: number;
   };
-  
+
   performance: {
     completionRate: number;
     averageCompletionTime: number;
     totalPoints: number;
   };
-  
+
   members: {
     total: number;
     active: number;
     newThisPeriod: number;
   };
-  
+
   memberStats?: Array<{
     userId: string;
     userName: string;
@@ -138,19 +140,24 @@ export interface GroupStats {
     points: number;
     rank?: number;
   }>;
-  
+
   trends: {
-    completionTrend: number;    // +/- percentage from previous period
+    completionTrend: number; // +/- percentage from previous period
     activityTrend: number;
   };
-  
+
   updatedAt: Timestamp;
 }
 
 export interface GroupNotification {
   id: string;
   groupId: string;
-  type: 'task_assigned' | 'task_completed' | 'member_joined' | 'member_left' | 'invite_sent';
+  type:
+    | 'task_assigned'
+    | 'task_completed'
+    | 'member_joined'
+    | 'member_left'
+    | 'invite_sent';
   title: string;
   message: string;
   data?: Record<string, any>;
@@ -159,6 +166,6 @@ export interface GroupNotification {
 }
 
 // Type aliases for consistency
-export type GroupInvitation = GroupInvite;  // Backward compatibility
+export type GroupInvitation = GroupInvite; // Backward compatibility
 export type FamilyGroup = Group;
 export type GroupRole = MemberRole;

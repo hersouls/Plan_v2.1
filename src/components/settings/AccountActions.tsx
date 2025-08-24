@@ -1,13 +1,21 @@
-import { useState } from 'react';
-import { 
-  Key, LogOut, Shield, AlertTriangle, 
-  Download, Upload, Lock, Mail, UserX
+import {
+  AlertTriangle,
+  Download,
+  Key,
+  Lock,
+  LogOut,
+  Mail,
+  Shield,
+  Upload,
+  UserX,
 } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import logger from '../../lib/logger';
+import { InlineLoading } from '../common/LoadingSpinner';
 import { GlassCard } from '../ui/GlassCard';
 import { WaveButton } from '../ui/WaveButton';
-import { InlineLoading } from '../common/LoadingSpinner';
-import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -19,14 +27,14 @@ interface ConfirmationModalProps {
   isDangerous?: boolean;
 }
 
-function ConfirmationModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title, 
-  message, 
+function ConfirmationModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
   confirmText,
-  isDangerous = false 
+  isDangerous = false,
 }: ConfirmationModalProps) {
   const [confirmInput, setConfirmInput] = useState('');
   const confirmWord = 'DELETE';
@@ -54,12 +62,16 @@ function ConfirmationModal({
         {isDangerous && (
           <div className="mb-4">
             <p className="text-sm text-gray-400 mb-2">
-              확인을 위해 <span className="font-mono font-bold text-red-400">{confirmWord}</span>를 입력하세요:
+              확인을 위해{' '}
+              <span className="font-mono font-bold text-red-400">
+                {confirmWord}
+              </span>
+              를 입력하세요:
             </p>
             <input
               type="text"
               value={confirmInput}
-              onChange={(e) => setConfirmInput(e.target.value.toUpperCase())}
+              onChange={e => setConfirmInput(e.target.value.toUpperCase())}
               className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400"
               placeholder={confirmWord}
             />
@@ -70,7 +82,7 @@ function ConfirmationModal({
           <WaveButton variant="ghost" onClick={onClose}>
             취소
           </WaveButton>
-          <WaveButton 
+          <WaveButton
             onClick={handleConfirm}
             disabled={isDangerous && confirmInput !== confirmWord}
             className={isDangerous ? 'bg-red-600 hover:bg-red-700' : ''}
@@ -86,7 +98,7 @@ function ConfirmationModal({
 export function AccountActions() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -94,7 +106,7 @@ export function AccountActions() {
   const [passwordForm, setPasswordForm] = useState({
     current: '',
     new: '',
-    confirm: ''
+    confirm: '',
   });
   const [passwordError, setPasswordError] = useState('');
 
@@ -112,13 +124,13 @@ export function AccountActions() {
     setLoading('password');
     try {
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      console.log('Password updated');
+
+      logger.info('AccountActions', 'password updated');
       setShowPasswordModal(false);
       setPasswordForm({ current: '', new: '', confirm: '' });
       setPasswordError('');
     } catch (error) {
-      console.error('Failed to update password:', error);
+      logger.error('AccountActions', 'update password failed', error);
       setPasswordError('비밀번호 변경에 실패했습니다.');
     } finally {
       setLoading(null);
@@ -129,31 +141,35 @@ export function AccountActions() {
     setLoading('export');
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       const data = {
         user: {
           email: user?.email,
           displayName: user?.displayName,
-          createdAt: user?.metadata?.creationTime
+          createdAt: user?.metadata?.creationTime,
         },
         settings: JSON.parse(localStorage.getItem('moonwave-settings') || '{}'),
         theme: JSON.parse(localStorage.getItem('moonwave-theme') || '{}'),
-        exportedAt: new Date().toISOString()
+        exportedAt: new Date().toISOString(),
       };
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `moonwave-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `moonwave-backup-${
+        new Date().toISOString().split('T')[0]
+      }.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      console.log('Data exported successfully');
+      logger.info('AccountActions', 'data exported');
     } catch (error) {
-      console.error('Failed to export data:', error);
+      logger.error('AccountActions', 'export data failed', error);
     } finally {
       setLoading(null);
     }
@@ -169,16 +185,19 @@ export function AccountActions() {
       const data = JSON.parse(text);
 
       if (data.settings) {
-        localStorage.setItem('moonwave-settings', JSON.stringify(data.settings));
+        localStorage.setItem(
+          'moonwave-settings',
+          JSON.stringify(data.settings)
+        );
       }
       if (data.theme) {
         localStorage.setItem('moonwave-theme', JSON.stringify(data.theme));
       }
 
-      console.log('Data imported successfully');
+      logger.info('AccountActions', 'data imported');
       window.location.reload();
     } catch (error) {
-      console.error('Failed to import data:', error);
+      logger.error('AccountActions', 'import data failed', error);
     } finally {
       setLoading(null);
     }
@@ -190,7 +209,7 @@ export function AccountActions() {
       await signOut();
       navigate('/login');
     } catch (error) {
-      console.error('Failed to logout:', error);
+      logger.error('AccountActions', 'logout failed', error);
     } finally {
       setLoading(null);
       setShowLogoutModal(false);
@@ -201,11 +220,11 @@ export function AccountActions() {
     setLoading('delete');
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      console.log('Account deleted');
+
+      logger.warn('AccountActions', 'account deleted');
       navigate('/login');
     } catch (error) {
-      console.error('Failed to delete account:', error);
+      logger.error('AccountActions', 'delete account failed', error);
     } finally {
       setLoading(null);
       setShowDeleteModal(false);
@@ -216,7 +235,7 @@ export function AccountActions() {
     <div className="space-y-6">
       <GlassCard variant="light" className="p-6">
         <h3 className="text-lg font-semibold mb-6">계정 보안</h3>
-        
+
         <div className="space-y-3">
           <button
             onClick={() => setShowPasswordModal(true)}
@@ -228,30 +247,32 @@ export function AccountActions() {
               </div>
               <div className="text-left">
                 <p className="font-medium text-gray-900">비밀번호 변경</p>
-                <p className="text-sm text-gray-600">계정 보안을 위해 정기적으로 변경하세요</p>
+                <p className="text-sm text-gray-600">
+                  계정 보안을 위해 정기적으로 변경하세요
+                </p>
               </div>
             </div>
             <Lock size={20} className="text-gray-400" />
           </button>
 
-          <button
-            className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
+          <button className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
                 <Shield size={18} className="text-green-600" />
               </div>
               <div className="text-left">
                 <p className="font-medium text-gray-900">2단계 인증</p>
-                <p className="text-sm text-gray-600">추가 보안 계층을 활성화합니다</p>
+                <p className="text-sm text-gray-600">
+                  추가 보안 계층을 활성화합니다
+                </p>
               </div>
             </div>
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">활성화됨</span>
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+              활성화됨
+            </span>
           </button>
 
-          <button
-            className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
+          <button className="w-full flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
                 <Mail size={18} className="text-purple-600" />
@@ -268,7 +289,7 @@ export function AccountActions() {
 
       <GlassCard variant="light" className="p-6">
         <h3 className="text-lg font-semibold mb-6">데이터 관리</h3>
-        
+
         <div className="space-y-3">
           <WaveButton
             variant="ghost"
@@ -298,7 +319,7 @@ export function AccountActions() {
               variant="ghost"
               className="w-full justify-start"
               disabled={loading === 'import'}
-              onClick={(e) => {
+              onClick={e => {
                 e.preventDefault();
                 e.currentTarget.parentElement?.querySelector('input')?.click();
               }}
@@ -318,7 +339,7 @@ export function AccountActions() {
 
       <GlassCard variant="light" className="p-6 border-red-200 bg-red-50">
         <h3 className="text-lg font-semibold mb-6 text-red-700">위험 구역</h3>
-        
+
         <div className="space-y-3">
           <WaveButton
             variant="ghost"
@@ -350,8 +371,10 @@ export function AccountActions() {
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <GlassCard variant="strong" className="max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">비밀번호 변경</h3>
-            
+            <h3 className="text-lg font-semibold text-white mb-4">
+              비밀번호 변경
+            </h3>
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -360,7 +383,12 @@ export function AccountActions() {
                 <input
                   type="password"
                   value={passwordForm.current}
-                  onChange={(e) => setPasswordForm(prev => ({ ...prev, current: e.target.value }))}
+                  onChange={e =>
+                    setPasswordForm(prev => ({
+                      ...prev,
+                      current: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
@@ -372,7 +400,9 @@ export function AccountActions() {
                 <input
                   type="password"
                   value={passwordForm.new}
-                  onChange={(e) => setPasswordForm(prev => ({ ...prev, new: e.target.value }))}
+                  onChange={e =>
+                    setPasswordForm(prev => ({ ...prev, new: e.target.value }))
+                  }
                   className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
@@ -384,7 +414,12 @@ export function AccountActions() {
                 <input
                   type="password"
                   value={passwordForm.confirm}
-                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm: e.target.value }))}
+                  onChange={e =>
+                    setPasswordForm(prev => ({
+                      ...prev,
+                      confirm: e.target.value,
+                    }))
+                  }
                   className="w-full px-3 py-2 bg-white/10 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
@@ -395,8 +430,8 @@ export function AccountActions() {
             </div>
 
             <div className="flex gap-3 justify-end mt-6">
-              <WaveButton 
-                variant="ghost" 
+              <WaveButton
+                variant="ghost"
                 onClick={() => {
                   setShowPasswordModal(false);
                   setPasswordForm({ current: '', new: '', confirm: '' });
@@ -405,7 +440,7 @@ export function AccountActions() {
               >
                 취소
               </WaveButton>
-              <WaveButton 
+              <WaveButton
                 onClick={handlePasswordChange}
                 disabled={loading === 'password'}
               >

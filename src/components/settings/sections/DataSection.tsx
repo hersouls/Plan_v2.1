@@ -8,9 +8,10 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { BackupScheduler, BackupService } from '../../../lib/backup';
+import logger from '../../../lib/logger';
 import { cn } from '../../../lib/utils';
 import { InlineLoading } from '../../common/LoadingSpinner';
 import { WaveButton } from '../../ui/WaveButton';
@@ -29,7 +30,14 @@ export function DataSection({
     'idle' | 'running' | 'completed' | 'error'
   >('idle');
   const [backupMessage, setBackupMessage] = useState('');
-  const [backupList, setBackupList] = useState<any[]>([]);
+  const [backupList, setBackupList] = useState<
+    Array<{
+      name: string;
+      timestamp: number | string;
+      frequency: 'weekly' | 'monthly' | string;
+      path: string;
+    }>
+  >([]);
   const [loadingBackups, setLoadingBackups] = useState(false);
 
   // AuthContext 접근을 안전하게 처리
@@ -37,14 +45,21 @@ export function DataSection({
 
   useEffect(() => {
     try {
-      setSignOut(() => authContext.signOut);
+      const fn = authContext.signOut;
+      setSignOut(() =>
+        fn
+          ? async () => {
+              await fn();
+            }
+          : async () => {}
+      );
     } catch (error) {
-      console.error('Error accessing auth context in DataSection:', error);
+      logger.error('DataSection', 'access auth context failed', error);
       // Auth context가 없어도 기본적으로 작동
     }
   }, [authContext.signOut]);
 
-  const updateData = (field: keyof typeof settings.data, value: any) => {
+  const updateData = (field: keyof typeof settings.data, value: string | boolean | number) => {
     onUpdate({
       type: 'UPDATE_DATA',
       payload: {
@@ -83,7 +98,7 @@ export function DataSection({
 
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to export data:', error);
+      logger.error('DataSection', 'export data failed', error);
       alert('데이터 내보내기에 실패했습니다.');
     } finally {
       setExporting(false);
@@ -108,7 +123,7 @@ export function DataSection({
       onUpdate({ type: 'LOAD_SETTINGS', payload: data });
       alert('데이터를 성공적으로 가져왔습니다.');
     } catch (error) {
-      console.error('Failed to import data:', error);
+      logger.error('DataSection', 'import data failed', error);
       alert('데이터 가져오기에 실패했습니다. 파일 형식을 확인해주세요.');
     } finally {
       setImporting(false);
@@ -129,16 +144,25 @@ export function DataSection({
 
       if (doubleConfirmed) {
         try {
-          // 로컬 스토리지 클리어
-          localStorage.removeItem('moonwave-settings');
-          localStorage.clear();
+          // 앱 관련 데이터만 안전하게 삭제
+          const appKeys = [
+            'moonwave-settings',
+            'moonwave-settings-tab',
+            'moonwave-user-preferences',
+            'moonwave-cache',
+            'moonwave-backup',
+          ];
+          
+          appKeys.forEach(key => {
+            localStorage.removeItem(key);
+          });
 
           // 설정 초기화
           onUpdate({ type: 'RESET_TO_DEFAULTS' });
 
           alert('모든 데이터가 삭제되었습니다.');
         } catch (error) {
-          console.error('Failed to clear data:', error);
+          logger.error('DataSection', 'clear data failed', error);
           alert('데이터 삭제에 실패했습니다.');
         }
       }
@@ -151,7 +175,7 @@ export function DataSection({
       try {
         await signOut();
       } catch (error) {
-        console.error('Failed to sign out:', error);
+        logger.error('DataSection', 'sign out failed', error);
         alert('로그아웃에 실패했습니다.');
       }
     }
@@ -228,7 +252,7 @@ export function DataSection({
         setBackupMessage('');
       }, 3000);
     } catch (error) {
-      console.error('Backup failed:', error);
+      logger.error('DataSection', 'backup failed', error);
       setBackupStatus('error');
       setBackupMessage('백업 생성에 실패했습니다.');
 
@@ -239,7 +263,7 @@ export function DataSection({
     }
   };
 
-  const loadBackupList = async () => {
+  const loadBackupList = useCallback(async () => {
     if (!authContext.user?.uid) return;
 
     setLoadingBackups(true);
@@ -248,11 +272,11 @@ export function DataSection({
       const backups = await backupService.getBackupList();
       setBackupList(backups);
     } catch (error) {
-      console.error('Failed to load backup list:', error);
+      logger.error('DataSection', 'load backup list failed', error);
     } finally {
       setLoadingBackups(false);
     }
-  };
+  }, [authContext.user?.uid]);
 
   const restoreFromBackup = async (backupPath: string) => {
     if (!authContext.user?.uid) {
@@ -284,7 +308,7 @@ export function DataSection({
         setBackupMessage('');
       }, 3000);
     } catch (error) {
-      console.error('Restore failed:', error);
+      logger.error('DataSection', 'restore failed', error);
       setBackupStatus('error');
       setBackupMessage('데이터 복원에 실패했습니다.');
 
@@ -310,7 +334,7 @@ export function DataSection({
       loadBackupList();
       alert('백업이 삭제되었습니다.');
     } catch (error) {
-      console.error('Failed to delete backup:', error);
+      logger.error('DataSection', 'delete backup failed', error);
       alert('백업 삭제에 실패했습니다.');
     }
   };
@@ -320,7 +344,7 @@ export function DataSection({
     if (isActive && authContext.user?.uid) {
       loadBackupList();
     }
-  }, [isActive, authContext.user?.uid]);
+  }, [isActive, authContext.user?.uid, loadBackupList]);
 
   if (!isActive) return null;
 

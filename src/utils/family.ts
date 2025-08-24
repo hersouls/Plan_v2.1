@@ -8,6 +8,7 @@ import {
   subDays,
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import logger from '../lib/logger';
 import {
   ActivityType,
   FamilyActivity,
@@ -28,9 +29,9 @@ export const formatRelativeTime = (
     const dateObj =
       typeof date === 'string'
         ? new Date(date)
-        : date?.toDate
-        ? date.toDate()
-        : new Date(date);
+        : (date as any)?.toDate
+        ? (date as any).toDate()
+        : new Date(date as any);
 
     if (isNaN(dateObj.getTime())) {
       return '날짜 정보 없음';
@@ -41,7 +42,7 @@ export const formatRelativeTime = (
       locale: ko,
     });
   } catch (error) {
-    console.warn('Error formatting relative time:', error);
+    logger.warn('family', 'Error formatting relative time', error);
     return '날짜 정보 없음';
   }
 };
@@ -54,9 +55,9 @@ export const formatDateTime = (
     const dateObj =
       typeof date === 'string'
         ? new Date(date)
-        : date?.toDate
-        ? date.toDate()
-        : new Date(date);
+        : (date as any)?.toDate
+        ? (date as any).toDate()
+        : new Date(date as any);
 
     if (isNaN(dateObj.getTime())) {
       return '날짜 정보 없음';
@@ -64,7 +65,7 @@ export const formatDateTime = (
 
     return format(dateObj, formatString);
   } catch (error) {
-    console.warn('Error formatting date time:', error);
+    logger.warn('family', 'Error formatting date time', error);
     return '날짜 정보 없음';
   }
 };
@@ -77,9 +78,9 @@ export const isWithinTimeRange = (
     const dateObj =
       typeof date === 'string'
         ? new Date(date)
-        : date?.toDate
-        ? date.toDate()
-        : new Date(date);
+        : (date as any)?.toDate
+        ? (date as any).toDate()
+        : new Date(date as any);
 
     if (isNaN(dateObj.getTime())) {
       return false;
@@ -98,7 +99,7 @@ export const isWithinTimeRange = (
         return false;
     }
   } catch (error) {
-    console.warn('Error checking time range:', error);
+    logger.warn('family', 'Error checking time range', error);
     return false;
   }
 };
@@ -199,9 +200,9 @@ export const calculateFamilyStats = (
     const activityDate =
       typeof activity.timestamp === 'string'
         ? new Date(activity.timestamp)
-        : activity.timestamp?.toDate
-        ? activity.timestamp.toDate()
-        : new Date(activity.timestamp);
+        : (activity.timestamp as any)?.toDate
+        ? (activity.timestamp as any).toDate()
+        : new Date(activity.timestamp as any);
     return (
       activityDate >= previousPeriodStart &&
       activityDate <
@@ -264,9 +265,9 @@ export const calculateMemberPerformance = (
       const activityDate =
         typeof activity.timestamp === 'string'
           ? new Date(activity.timestamp)
-          : activity.timestamp?.toDate
-          ? activity.timestamp.toDate()
-          : new Date(activity.timestamp);
+          : (activity.timestamp as any)?.toDate
+          ? (activity.timestamp as any).toDate()
+          : new Date(activity.timestamp as any);
       return (
         format(activityDate, 'yyyy-MM-dd') ===
           format(checkDate, 'yyyy-MM-dd') && activity.type === 'task_completed'
@@ -443,9 +444,9 @@ export const calculateEngagementScore = (
       const date =
         typeof a.timestamp === 'string'
           ? new Date(a.timestamp)
-          : a.timestamp?.toDate
-          ? a.timestamp.toDate()
-          : new Date(a.timestamp);
+          : (a.timestamp as any)?.toDate
+          ? (a.timestamp as any).toDate()
+          : new Date(a.timestamp as any);
       return format(date, 'yyyy-MM-dd');
     })
   );

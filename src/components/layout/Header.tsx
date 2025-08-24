@@ -8,7 +8,7 @@ import {
   Users,
 } from 'lucide-react';
 import { memo, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import { cn } from '../../lib/utils';
 
@@ -83,56 +83,65 @@ const IconButton = memo<{
   isActive: boolean;
   showBadge?: boolean;
   badgeCount?: number;
-}>(({ item, isActive, showBadge = false, badgeCount = 0 }) => {
+  onClick?: () => void;
+}>(({ item, isActive, showBadge = false, badgeCount = 0, onClick }) => {
   const Icon = item.icon;
 
-  return (
-    <Link to={item.path} className="group touch-optimized">
-      <button
-        aria-label={item.ariaLabel}
-        aria-current={isActive ? 'page' : undefined}
+  const buttonContent = (
+    <button
+      aria-label={item.ariaLabel}
+      aria-current={isActive ? 'page' : undefined}
+      onClick={onClick}
+      className={cn(
+        'relative rounded-xl transition-all duration-300 ease-out',
+        'hover:bg-white/15 active:bg-white/25 hover:scale-105 active:scale-95',
+        'focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-2 focus:ring-offset-slate-900',
+        'touch-target flex items-center justify-center',
+        // 반응형 패딩 - Mobile은 작게, 나머지는 크게
+        'p-1.5 sm:p-3 md:p-4 lg:p-5 xl:p-6',
+        // 반응형 최소 크기 - Mobile은 작게, 나머지는 크게
+        'min-w-8 min-h-8 sm:min-w-12 sm:min-h-12 md:min-w-14 md:min-h-14 lg:min-w-16 lg:min-h-16 xl:min-w-18 xl:min-h-18',
+        isActive && 'bg-white/20 shadow-lg shadow-white/10'
+      )}
+    >
+      <Icon
         className={cn(
-          'relative rounded-xl transition-all duration-300 ease-out',
-          'hover:bg-white/15 active:bg-white/25 hover:scale-105 active:scale-95',
-          'focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-2 focus:ring-offset-slate-900',
-          'touch-target flex items-center justify-center',
-          // 반응형 패딩 - Mobile은 작게, 나머지는 크게
-          'p-1.5 sm:p-3 md:p-4 lg:p-5 xl:p-6',
-          // 반응형 최소 크기 - Mobile은 작게, 나머지는 크게
-          'min-w-8 min-h-8 sm:min-w-12 sm:min-h-12 md:min-w-14 md:min-h-14 lg:min-w-16 lg:min-h-16 xl:min-w-18 xl:min-h-18',
-          isActive && 'bg-white/20 shadow-lg shadow-white/10'
+          'transition-all duration-300 ease-out',
+          // 반응형 아이콘 크기 - Mobile은 작게, 나머지는 크게
+          'w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9',
+          isActive
+            ? 'text-yellow-300 drop-shadow-sm'
+            : 'text-white/90 group-hover:text-white'
         )}
-      >
-        <Icon
-          className={cn(
-            'transition-all duration-300 ease-out',
-            // 반응형 아이콘 크기 - Mobile은 작게, 나머지는 크게
-            'w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9',
-            isActive
-              ? 'text-yellow-300 drop-shadow-sm'
-              : 'text-white/90 group-hover:text-white'
-          )}
-          strokeWidth={isActive ? 2.5 : 2}
+        strokeWidth={isActive ? 2.5 : 2}
+      />
+
+      {/* 알림 배지 */}
+      {showBadge && badgeCount > 0 && (
+        <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-4 h-4 flex items-center justify-center px-1 shadow-lg">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </div>
+      )}
+
+      {/* Active indicator */}
+      {isActive && (
+        <div
+          className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-yellow-300 rounded-full shadow-lg shadow-yellow-300/50"
+          aria-hidden="true"
         />
+      )}
 
-        {/* 알림 배지 */}
-        {showBadge && badgeCount > 0 && (
-          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-4 h-4 flex items-center justify-center px-1 shadow-lg">
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </div>
-        )}
+      {/* Hover effect */}
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    </button>
+  );
 
-        {/* Active indicator */}
-        {isActive && (
-          <div
-            className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-yellow-300 rounded-full shadow-lg shadow-yellow-300/50"
-            aria-hidden="true"
-          />
-        )}
-
-        {/* Hover effect */}
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-      </button>
+  // onClick이 있으면 버튼만, 없으면 Link로 감싸기
+  return onClick ? (
+    <div className="group touch-optimized">{buttonContent}</div>
+  ) : (
+    <Link to={item.path} className="group touch-optimized">
+      {buttonContent}
     </Link>
   );
 });
@@ -141,6 +150,7 @@ IconButton.displayName = 'IconButton';
 
 export const Header = memo(() => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { stats } = useNotifications();
 
   // Memoize active path checks for all nav items
@@ -155,6 +165,11 @@ export const Header = memo(() => {
       return acc;
     }, {} as Record<string, boolean>);
   }, [location.pathname]);
+
+  // 알림 페이지로 이동
+  const handleNotificationClick = () => {
+    navigate('/notifications');
+  };
 
   return (
     <header
@@ -182,17 +197,33 @@ export const Header = memo(() => {
             className="flex items-center gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3 xl:gap-4"
             aria-label="오른쪽 메뉴"
           >
-            {RIGHT_NAV_ITEMS.map(item => (
-              <IconButton
-                key={item.path + item.label}
-                item={item}
-                isActive={activeStates[item.path]}
-                showBadge={item.path === '/notifications'}
-                badgeCount={
-                  item.path === '/notifications' ? stats?.unread || 0 : 0
-                }
-              />
-            ))}
+            {RIGHT_NAV_ITEMS.map(item => {
+              // 알림 아이템인 경우 페이지 이동
+              if (item.path === '/notifications') {
+                return (
+                  <div key={item.path + item.label} className="relative">
+                    <IconButton
+                      item={item}
+                      isActive={activeStates[item.path]}
+                      showBadge={true}
+                      badgeCount={stats?.unread || 0}
+                      onClick={handleNotificationClick}
+                    />
+                  </div>
+                );
+              }
+
+              // 일반 아이템
+              return (
+                <IconButton
+                  key={item.path + item.label}
+                  item={item}
+                  isActive={activeStates[item.path]}
+                  showBadge={false}
+                  badgeCount={0}
+                />
+              );
+            })}
           </nav>
         </div>
       </div>

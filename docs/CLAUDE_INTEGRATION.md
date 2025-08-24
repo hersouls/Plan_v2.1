@@ -5,16 +5,19 @@ Moonwave Plan에 Claude AI 기능이 통합되어 스마트한 할일 관리를 
 ## 🚀 기능 개요
 
 ### 1. **AI 할일 어시스턴트**
+
 - 자연어로 할일 생성 및 관리
 - 컨텍스트 기반 할일 제안
 - 스마트한 카테고리 자동 분류
 
 ### 2. **스마트 입력 향상**
+
 - 실시간 할일 분석 및 향상
 - 자동 우선순위 제안
 - 예상 소요시간 계산
 
 ### 3. **AI 기반 제안**
+
 - 상황별 맞춤 할일 추천
 - 가족 구성원 기반 할일 배분
 - 효율적인 할일 순서 제안
@@ -29,7 +32,7 @@ Moonwave Plan에 Claude AI 기능이 통합되어 스마트한 할일 관리를 
 # Claude AI Configuration
 VITE_CLAUDE_API_KEY=your-claude-api-key
 CLAUDE_API_KEY=your-claude-api-key
-VITE_CLAUDE_MODEL=claude-3-5-sonnet-20241022
+VITE_CLAUDE_MODEL=claude-sonnet-4-20250514
 VITE_CLAUDE_MAX_TOKENS=4096
 VITE_ENABLE_CLAUDE_AI=true
 
@@ -65,17 +68,15 @@ import { ClaudeAssistant } from '@/components/ai';
 function TaskPage() {
   const [assistantOpen, setAssistantOpen] = useState(false);
 
-  const handleTaskSuggestion = (suggestion) => {
+  const handleTaskSuggestion = suggestion => {
     // 제안된 할일을 처리
     console.log('AI 제안:', suggestion);
   };
 
   return (
     <div>
-      <button onClick={() => setAssistantOpen(true)}>
-        AI 어시스턴트 열기
-      </button>
-      
+      <button onClick={() => setAssistantOpen(true)}>AI 어시스턴트 열기</button>
+
       <ClaudeAssistant
         isOpen={assistantOpen}
         onClose={() => setAssistantOpen(false)}
@@ -94,11 +95,11 @@ import { SmartTaskInput } from '@/components/ai';
 function CreateTask() {
   const [taskTitle, setTaskTitle] = useState('');
 
-  const handleSmartSuggestion = (suggestion) => {
+  const handleSmartSuggestion = suggestion => {
     // AI 향상 제안 적용
     setTaskData({
       ...taskData,
-      ...suggestion
+      ...suggestion,
     });
   };
 
@@ -119,7 +120,7 @@ function CreateTask() {
 import { AITaskSuggestions } from '@/components/ai';
 
 function Dashboard() {
-  const handleTaskSelect = (suggestion) => {
+  const handleTaskSelect = suggestion => {
     // 제안된 할일을 할일 목록에 추가
     addTask(suggestion);
   };
@@ -147,7 +148,7 @@ function CustomAIFeature() {
 
   const generateWeeklyPlan = async () => {
     const suggestions = await generateTaskSuggestions(
-      "이번 주 가족 일정을 위한 할일 계획을 세워주세요"
+      '이번 주 가족 일정을 위한 할일 계획을 세워주세요'
     );
     return suggestions;
   };
@@ -157,13 +158,16 @@ function CustomAIFeature() {
 ### 2. 배치 처리
 
 ```typescript
-const enhanceMultipleTasks = async (tasks) => {
+const enhanceMultipleTasks = async tasks => {
   const enhanced = await Promise.all(
-    tasks.map(async (task) => ({
+    tasks.map(async task => ({
       ...task,
       category: await categorizeTask(task.title, task.description),
       priority: await suggestTaskPriority(task.title, task.description),
-      estimatedMinutes: await estimateTaskDuration(task.title, task.description)
+      estimatedMinutes: await estimateTaskDuration(
+        task.title,
+        task.description
+      ),
     }))
   );
   return enhanced;
@@ -219,31 +223,34 @@ node scripts/mcp-task-server.js
 
 ```tsx
 const handleAIInteraction = {
-  onSuggestionReceived: (suggestion) => {
+  onSuggestionReceived: suggestion => {
     // 제안 받았을 때
   },
-  onError: (error) => {
+  onError: error => {
     // 오류 발생 시
   },
-  onSuccess: (result) => {
+  onSuccess: result => {
     // 성공 시
-  }
+  },
 };
 ```
 
 ## 🚨 주의사항
 
 ### 1. API 사용량 관리
+
 - Claude API는 토큰 기반 과금
 - 요청 빈도 제한 고려
 - 캐싱 전략 구현 권장
 
 ### 2. 보안 고려사항
+
 - API 키는 환경 변수로 관리
 - 클라이언트 사이드에서는 제한적 노출
 - 민감한 데이터 전송 주의
 
 ### 3. 오프라인 대응
+
 - 네트워크 연결 상태 확인
 - 기본 동작 모드 제공
 - 사용자 피드백 표시
@@ -253,16 +260,20 @@ const handleAIInteraction = {
 ### 자주 발생하는 문제
 
 1. **API 키 오류**
+
    ```bash
    Error: Invalid API key
    ```
+
    - `.env` 파일의 API 키 확인
    - 환경 변수 로딩 확인
 
 2. **네트워크 오류**
+
    ```bash
    Error: Network request failed
    ```
+
    - 인터넷 연결 확인
    - 방화벽 설정 확인
 

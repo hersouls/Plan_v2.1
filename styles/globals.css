@@ -1,7 +1,7 @@
 /* =============================================================================
  * FONT CONFIGURATION - Korean Font
  * ============================================================================= */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/PretendardVariable.css');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
 
 @tailwind base;
 @tailwind components;
@@ -613,6 +613,183 @@ html {
  * MOONWAVE PLAN COMPONENT STYLES - Family Task Management
  * ============================================================================= */
 
+/* WaveButton Component Styles */
+.wave-button {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-pretendard);
+  transition: all var(--duration-normal) var(--ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--foundation-borderRadius-lg);
+  font-weight: 500;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Remove default browser focus outline/ring for WaveButton */
+.wave-button:focus,
+.wave-button:focus-visible {
+  outline: none;
+}
+
+.wave-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.wave-button-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  width: 100%;
+  height: 100%;
+}
+
+.wave-button-wave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+  z-index: 1;
+}
+
+.wave-button:hover .wave-button-wave {
+  width: 300px;
+  height: 300px;
+}
+
+.wave-button-ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  animation: ripple 0.6s ease-out;
+  z-index: 1;
+}
+
+@keyframes ripple {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 300px;
+    height: 300px;
+    opacity: 0;
+  }
+}
+
+/* WaveButton Variants */
+.wave-button-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: var(--foundation-shadow-sm);
+}
+
+.wave-button-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--foundation-shadow-md);
+}
+
+.wave-button-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--foundation-shadow-sm);
+}
+
+.wave-button-secondary {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  box-shadow: var(--foundation-shadow-sm);
+}
+
+.wave-button-secondary:hover {
+  background: var(--secondary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--foundation-shadow-md);
+}
+
+.wave-button-secondary:active {
+  transform: translateY(0);
+  box-shadow: var(--foundation-shadow-sm);
+}
+
+.wave-button-ghost {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.wave-button-ghost:hover {
+  background: var(--accent);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.wave-button-ghost:active {
+  transform: translateY(0);
+}
+
+.wave-button-travel {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  box-shadow: var(--foundation-shadow-sm);
+}
+
+.wave-button-travel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--foundation-shadow-lg);
+}
+
+.wave-button-travel:active {
+  transform: translateY(0);
+  box-shadow: var(--foundation-shadow-sm);
+}
+
+/* WaveButton Sizes */
+.wave-button-sm {
+  padding: var(--foundation-spacing-2) var(--foundation-spacing-3);
+  font-size: var(--foundation-fontSize-sm);
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+}
+
+.wave-button-md {
+  padding: var(--foundation-spacing-3) var(--foundation-spacing-4);
+  font-size: var(--foundation-fontSize-base);
+  min-height: 3rem;
+  min-width: 3rem;
+}
+
+.wave-button-lg {
+  padding: var(--foundation-spacing-4) var(--foundation-spacing-5);
+  font-size: var(--foundation-fontSize-lg);
+  min-height: 3.5rem;
+  min-width: 3.5rem;
+}
+
 /* Task Card Styles */
 .task-card {
   background: var(--component-taskCard-backgroundColor);
@@ -841,6 +1018,13 @@ html {
 }
 
 /* Primary color utilities */
+.bg-primary-gradient {
+  background: var(--primary-gradient);
+}
+
+.bg-brand-chip {
+  background: var(--primary-gradient);
+}
 .bg-primary {
   background-color: var(--primary);
   color: var(--primary-foreground);
@@ -934,6 +1118,16 @@ html {
 .focus-visible:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Native select dropdown fix for dark UI: keep control text white, options black on white */
+.mw-select {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.mw-select option {
+  color: #111827; /* gray-900 */
+  background-color: #ffffff; /* white */
 }
 
 /* Line clamp utilities */
@@ -1153,6 +1347,47 @@ html {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* WaveBackground animations */
+@keyframes wave-move {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.02);
+  }
+  50% {
+    transform: translateY(10px) scale(1.03);
+  }
+}
+
+@keyframes wave-move-reverse {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.02);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.01);
+  }
+}
+
+.animate-wave {
+  animation: wave-move 18s ease-in-out infinite;
+}
+
+.animate-wave-reverse {
+  animation: wave-move-reverse 22s ease-in-out infinite;
+}
+
+.wave-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-wave,
+  .animate-wave-reverse {
+    animation: none !important;
+  }
 }
 
 /* Performance optimizations for wave background */

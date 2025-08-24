@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { groupService } from '../lib/firestore';
+import logger from '../lib/logger';
 import {
   CreateGroupInput,
   FamilyGroup,
@@ -29,6 +30,7 @@ export interface UseGroupReturn {
   updateGroup: (groupId: string, updates: UpdateGroupInput) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
+  transferOwnership: (groupId: string, newOwnerUserId: string) => Promise<void>;
 
   // Member operations
   inviteByEmail: (
@@ -48,6 +50,15 @@ export interface UseGroupReturn {
   clearError: () => void;
   generateInviteCode: () => Promise<string>;
   joinGroupByCode: (inviteCode: string) => Promise<void>;
+
+  // Approval functions
+  getPendingInvitations: () => Promise<any[]>;
+  approveInvitation: (
+    invitationId: string,
+    userId: string,
+    role: string
+  ) => Promise<void>;
+  rejectInvitation: (invitationId: string) => Promise<void>;
 }
 
 export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
@@ -63,14 +74,6 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
   const clearError = useCallback(() => {
     setError(null);
   }, []);
-
-  const refetch = useCallback(() => {
-    if (groupId) {
-      loadGroupData(groupId);
-    } else {
-      loadGroupData(null);
-    }
-  }, [groupId]);
 
   const loadGroupData = useCallback(
     async (targetGroupId: string | null) => {
@@ -95,7 +98,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
           setMembers([]);
           setStats(null);
           // 에러 메시지를 설정하지 않고 조용히 처리
-          console.warn(`Group ${targetGroupId} not found`);
+          logger.warn(`Group ${targetGroupId} not found`);
           return;
         }
         setGroup(groupData);
@@ -108,7 +111,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
             );
             setMembers(membersData);
           } catch (error) {
-            console.error('Error loading members:', error);
+            logger.error('Error loading members:', error);
             setMembers([]);
           }
         }
@@ -123,8 +126,16 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
             if (loadMembers && statsData.memberStats) {
               setMembers(prevMembers =>
                 prevMembers.map(member => {
-                  const memberStat = statsData.memberStats.find(
-                    (stat: any) => stat.userId === member.userId
+                  type MemberStat = {
+                    userId: string;
+                    tasksCreated?: number;
+                    tasksAssigned?: number;
+                    tasksCompleted?: number;
+                  };
+                  const memberStats = (statsData.memberStats ||
+                    []) as MemberStat[];
+                  const memberStat = memberStats.find(
+                    ms => ms.userId === member.userId
                   );
                   return {
                     ...member,
@@ -136,12 +147,12 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
               );
             }
           } catch (error) {
-            console.error('Error loading stats:', error);
+            logger.error('Error loading stats:', error);
             setStats(null);
           }
         }
       } catch (err) {
-        console.error('Error loading group data:', err);
+        logger.error('Error loading group data:', err);
         setError(
           err instanceof Error
             ? err.message
@@ -153,6 +164,14 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
     },
     [loadMembers, loadStats]
   );
+
+  const refetch = useCallback(() => {
+    if (groupId) {
+      loadGroupData(groupId);
+    } else {
+      loadGroupData(null);
+    }
+  }, [groupId, loadGroupData]);
 
   // Load group data when groupId changes
   useEffect(() => {
@@ -181,7 +200,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
           setGroup(groupData);
         },
         error => {
-          console.error('Error subscribing to group:', error);
+          logger.error('Error subscribing to group:', error);
           setError('그룹 정보 구독 중 오류가 발생했습니다.');
         }
       );
@@ -191,9 +210,34 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
         const updateMembers = async () => {
           try {
             const membersData = await groupService.getGroupMembers(groupId);
-            setMembers(membersData);
+
+            // When stats are requested, merge latest stats into members so that
+            // tasksCreated/Assigned/Completed are not reset to 0 by periodic refreshes
+            if (loadStats) {
+              try {
+                const statsData = await groupService.getGroupStats(groupId);
+                setStats(statsData);
+                const merged = membersData.map(member => {
+                  const ms = (statsData.memberStats || []).find(
+                    (s: any) => s.userId === member.userId
+                  );
+                  return {
+                    ...member,
+                    tasksCreated: ms?.tasksCreated || 0,
+                    tasksAssigned: ms?.tasksAssigned || 0,
+                    tasksCompleted: ms?.tasksCompleted || 0,
+                  };
+                });
+                setMembers(merged);
+              } catch (statsError) {
+                logger.error('Error updating member stats:', statsError);
+                setMembers(membersData);
+              }
+            } else {
+              setMembers(membersData);
+            }
           } catch (error) {
-            console.error('Error updating members:', error);
+            logger.error('Error updating members:', error);
             // 그룹이 존재하지 않는 경우 빈 배열로 설정
             setMembers([]);
           }
@@ -207,7 +251,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
         unsubscribeMembers = () => clearInterval(interval);
       }
     } catch (error) {
-      console.error('Error setting up subscriptions:', error);
+      logger.error('Error setting up subscriptions:', error);
     }
 
     return () => {
@@ -244,13 +288,13 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
             });
           }
         } catch (profileError) {
-          console.warn('Failed to update user profile:', profileError);
+          logger.warn('Failed to update user profile:', profileError);
           // Don't throw error as group creation was successful
         }
 
         return newGroupId;
       } catch (err) {
-        console.error('Error creating group:', err);
+        logger.error('Error creating group:', err);
         setError('그룹을 생성하는 중 오류가 발생했습니다.');
         throw err;
       }
@@ -271,7 +315,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
           );
         }
       } catch (err) {
-        console.error('Error updating group:', err);
+        logger.error('Error updating group:', err);
         setError('그룹을 업데이트하는 중 오류가 발생했습니다.');
         throw err;
       }
@@ -297,7 +341,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
           setStats(null);
         }
       } catch (err) {
-        console.error('Error deleting group:', err);
+        logger.error('Error deleting group:', err);
         setError('그룹을 삭제하는 중 오류가 발생했습니다.');
         throw err;
       }
@@ -323,12 +367,40 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
           setStats(null);
         }
       } catch (err) {
-        console.error('Error leaving group:', err);
+        logger.error('Error leaving group:', err);
         setError('그룹을 나가는 중 오류가 발생했습니다.');
         throw err;
       }
     },
     [user, group]
+  );
+
+  const transferOwnership = useCallback(
+    async (targetGroupId: string, newOwnerUserId: string) => {
+      if (!user) {
+        setError('로그인이 필요합니다.');
+        throw new Error('로그인이 필요합니다.');
+      }
+
+      try {
+        setError(null);
+        await groupService.transferOwnership(
+          targetGroupId,
+          newOwnerUserId,
+          user.uid
+        );
+
+        // Refresh group state after transfer
+        if (group && targetGroupId === group.id) {
+          await loadGroupData(targetGroupId);
+        }
+      } catch (err) {
+        logger.error('Error transferring ownership:', err);
+        setError('그룹장 권한을 양도하는 중 오류가 발생했습니다.');
+        throw err;
+      }
+    },
+    [user, group, loadGroupData]
   );
 
   // Member operations
@@ -347,7 +419,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
         setError(null);
         await groupService.inviteMemberByEmail(targetGroupId, email, role);
       } catch (err) {
-        console.error('Error inviting member:', err);
+        logger.error('Error inviting member:', err);
         setError('멤버를 초대하는 중 오류가 발생했습니다.');
         throw err;
       }
@@ -364,7 +436,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
         // Update local members state
         setMembers(prev => prev.filter(member => member.userId !== userId));
       } catch (err) {
-        console.error('Error removing member:', err);
+        logger.error('Error removing member:', err);
         setError('멤버를 제거하는 중 오류가 발생했습니다.');
         throw err;
       }
@@ -385,7 +457,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
           )
         );
       } catch (err) {
-        console.error('Error changing member role:', err);
+        logger.error('Error changing member role:', err);
         setError('멤버 역할을 변경하는 중 오류가 발생했습니다.');
         throw err;
       }
@@ -409,7 +481,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
 
       return inviteCode;
     } catch (err) {
-      console.error('Error generating invite code:', err);
+      logger.error('Error generating invite code:', err);
       setError('초대 코드를 생성하는 중 오류가 발생했습니다.');
       throw err;
     }
@@ -432,12 +504,72 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
         // Load the newly joined group data
         await loadGroupData(joinedGroupId);
       } catch (err) {
-        console.error('Error joining group:', err);
+        logger.error('Error joining group:', err);
         setError('그룹에 참여하는 중 오류가 발생했습니다.');
         throw err;
       }
     },
     [user, loadGroupData]
+  );
+
+  const getPendingInvitations = useCallback(async (): Promise<any[]> => {
+    if (!groupId) {
+      return [];
+    }
+
+    try {
+      setError(null);
+      return await groupService.getPendingInvitations(groupId);
+    } catch (err) {
+      logger.error('Error getting pending invitations:', err);
+      setError('대기 중인 초대를 불러오는 중 오류가 발생했습니다.');
+      throw err;
+    }
+  }, [groupId]);
+
+  const approveInvitation = useCallback(
+    async (
+      invitationId: string,
+      userId: string,
+      role: string
+    ): Promise<void> => {
+      if (!groupId) {
+        setError('그룹 ID가 필요합니다.');
+        throw new Error('그룹 ID가 필요합니다.');
+      }
+
+      try {
+        setError(null);
+        await groupService.approveInvitation(
+          invitationId,
+          groupId,
+          userId,
+          role
+        );
+
+        // Refresh group data after approval
+        await loadGroupData(groupId);
+      } catch (err) {
+        logger.error('Error approving invitation:', err);
+        setError('초대 승인 중 오류가 발생했습니다.');
+        throw err;
+      }
+    },
+    [groupId, loadGroupData]
+  );
+
+  const rejectInvitation = useCallback(
+    async (invitationId: string): Promise<void> => {
+      try {
+        setError(null);
+        await groupService.rejectInvitation(invitationId);
+      } catch (err) {
+        logger.error('Error rejecting invitation:', err);
+        setError('초대 거부 중 오류가 발생했습니다.');
+        throw err;
+      }
+    },
+    []
   );
 
   return {
@@ -453,6 +585,7 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
     updateGroup,
     deleteGroup,
     leaveGroup,
+    transferOwnership,
 
     // Member operations
     inviteByEmail,
@@ -464,6 +597,11 @@ export function useGroup(options: UseGroupOptions = {}): UseGroupReturn {
     clearError,
     generateInviteCode,
     joinGroupByCode,
+
+    // Approval functions
+    getPendingInvitations,
+    approveInvitation,
+    rejectInvitation,
   };
 }
 
@@ -481,21 +619,29 @@ export function useUserGroups() {
       return;
     }
 
-    const loadUserGroups = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const userGroups = await groupService.getUserGroups(user.uid);
-        setGroups(userGroups);
-      } catch (err) {
-        console.error('Error loading user groups:', err);
-        setError('사용자 그룹을 불러오는 중 오류가 발생했습니다.');
-      } finally {
+    setLoading(true);
+    setError(null);
+
+    const unsubscribe = groupService.subscribeToUserGroups(
+      user.uid,
+      nextGroups => {
+        setGroups(nextGroups || []);
+        setLoading(false);
+      },
+      err => {
+        logger.error('Error subscribing to user groups:', err);
+        setError('사용자 그룹 구독 중 오류가 발생했습니다.');
         setLoading(false);
       }
-    };
+    );
 
-    loadUserGroups();
+    return () => {
+      try {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      } catch {
+        /* noop */
+      }
+    };
   }, [user]);
 
   const refetch = useCallback(async () => {
@@ -507,7 +653,7 @@ export function useUserGroups() {
       const userGroups = await groupService.getUserGroups(user.uid);
       setGroups(userGroups);
     } catch (err) {
-      console.error('Error refetching user groups:', err);
+      logger.error('Error refetching user groups:', err);
       setError('사용자 그룹을 다시 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);

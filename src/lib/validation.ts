@@ -7,7 +7,7 @@ export interface ValidationRule {
   minLength?: number;
   maxLength?: number;
   pattern?: RegExp;
-  custom?: (value: any) => string | null;
+  custom?: (value: any, data?: any) => string | null;
   message?: string;
 }
 
@@ -32,7 +32,11 @@ export class ValidationService {
   /**
    * Validate a single field
    */
-  validateField(value: any, rules: ValidationRule): string | null {
+  validateField(
+    value: any,
+    rules: ValidationRule,
+    fullData?: any
+  ): string | null {
     // Required validation
     if (rules.required && this.isEmpty(value)) {
       return rules.message || '이 필드는 필수입니다.';
@@ -65,7 +69,7 @@ export class ValidationService {
 
     // Custom validation
     if (rules.custom) {
-      const customError = rules.custom(value);
+      const customError = rules.custom(value, fullData);
       if (customError) {
         return customError;
       }
@@ -86,7 +90,7 @@ export class ValidationService {
     Object.keys(rules).forEach(fieldName => {
       const value = data[fieldName];
       const fieldRules = rules[fieldName];
-      const error = this.validateField(value, fieldRules);
+      const error = this.validateField(value, fieldRules, data);
 
       if (error) {
         errors[fieldName] = error;
@@ -121,7 +125,7 @@ export class ValidationService {
       },
       phone: {
         required: false,
-        pattern: /^[0-9\-\+\(\)\s]+$/,
+        pattern: /^[0-9\-+()\s]+$/,
         message: '올바른 전화번호 형식을 입력해주세요.',
       },
       bio: {
@@ -275,6 +279,11 @@ export class ValidationService {
     } = options;
 
     // 파일 용량 제한 없음
+    if (file.size > maxSize) {
+      return `파일 크기가 허용된 최대 값(${this.formatFileSize(
+        maxSize
+      )})을 초과했습니다.`;
+    }
 
     // Check file type
     if (allowedTypes.length > 0 && !allowedTypes.includes(file.type)) {
@@ -298,7 +307,7 @@ export class ValidationService {
    * Phone number validation
    */
   isValidPhone(phone: string): boolean {
-    const phoneRegex = /^[0-9\-\+\(\)\s]+$/;
+    const phoneRegex = /^[0-9\-+()\s]+$/;
     return phoneRegex.test(phone);
   }
 

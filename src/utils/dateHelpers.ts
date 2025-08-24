@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import logger from '../lib/logger';
 
 /**
  * Converts Firebase Timestamp, Date, or string to Date object
@@ -24,7 +25,7 @@ export function toDate(
   if (timestamp instanceof Date) {
     // Check if the Date is valid
     if (isNaN(timestamp.getTime())) {
-      console.debug('Invalid Date object provided to toDate:', timestamp);
+      logger.debug('dateHelpers', 'invalid Date object', timestamp);
       return new Date();
     }
     return timestamp;
@@ -35,12 +36,15 @@ export function toDate(
       const date = timestamp.toDate();
       // Check if the converted Date is valid
       if (isNaN(date.getTime())) {
-        console.debug('Invalid Timestamp provided to toDate:', timestamp);
+        logger.debug('dateHelpers', 'invalid Timestamp', timestamp);
         return new Date();
       }
       return date;
     } catch (error) {
-      console.debug('Error converting Timestamp to Date:', error, timestamp);
+      logger.debug('dateHelpers', 'timestamp->date failed', {
+        error,
+        timestamp,
+      });
       return new Date();
     }
   }
@@ -50,12 +54,15 @@ export function toDate(
       const date = new Date(timestamp);
       // Check if the parsed Date is valid
       if (isNaN(date.getTime())) {
-        console.debug('Invalid date string provided to toDate:', timestamp);
+        logger.debug('dateHelpers', 'invalid date string', timestamp);
         return new Date();
       }
       return date;
     } catch (error) {
-      console.debug('Error parsing date string:', error, timestamp);
+      logger.debug('dateHelpers', 'parse date string failed', {
+        error,
+        timestamp,
+      });
       return new Date();
     }
   }
@@ -64,12 +71,15 @@ export function toDate(
   try {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) {
-      console.debug('Invalid timestamp value provided to toDate:', timestamp);
+      logger.debug('dateHelpers', 'invalid timestamp value', timestamp);
       return new Date();
     }
     return date;
   } catch (error) {
-    console.debug('Error creating Date from timestamp:', error, timestamp);
+    logger.debug('dateHelpers', 'create Date from timestamp failed', {
+      error,
+      timestamp,
+    });
     return new Date();
   }
 }
@@ -124,4 +134,54 @@ export function getStartOfWeek(): Date {
 export function getStartOfMonth(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/**
+ * Converts reminder time string to minutes
+ */
+export function parseReminderToMinutes(reminder: string): number {
+  const timeMap: Record<string, number> = {
+    '10분 전': 10,
+    '30분 전': 30,
+    '1시간 전': 60,
+    '1일 전': 1440,
+    '1주일 전': 10080,
+  };
+
+  return timeMap[reminder] || 0;
+}
+
+/**
+ * Converts minutes to reminder time string
+ */
+export function minutesToReminderString(minutes: number): string {
+  const timeMap: Record<number, string> = {
+    10: '10분 전',
+    30: '30분 전',
+    60: '1시간 전',
+    1440: '1일 전',
+    10080: '1주일 전',
+  };
+
+  return timeMap[minutes] || `${minutes}분 전`;
+}
+
+/**
+ * Converts Date/string/Timestamp to Firestore Timestamp (or undefined)
+ */
+export function toTimestamp(
+  input?: Date | string | Timestamp | null
+): Timestamp | undefined {
+  if (!input) return undefined;
+  if (input instanceof Timestamp) return input;
+  try {
+    const d = typeof input === 'string' ? new Date(input) : (input as Date);
+    if (d instanceof Date && !isNaN(d.getTime())) {
+      return Timestamp.fromDate(d);
+    }
+    return undefined;
+  } catch (error) {
+    logger.debug('dateHelpers', 'toTimestamp convert failed', { error, input });
+    return undefined;
+  }
 }

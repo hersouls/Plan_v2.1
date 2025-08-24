@@ -6,16 +6,16 @@ import {
   Link,
   Plus,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { LoadingSpinner } from '../common/LoadingSpinner';
+//
+import logger from '@/lib/logger';
+import { Timestamp } from 'firebase/firestore';
+import { uploadFile } from '../../lib/storage';
+import { FileAttachment, UrlAttachment } from '../../types/task';
 import { WaveButton } from '../ui/WaveButton';
 import { Typography } from '../ui/typography';
-import { FileAttachment, UrlAttachment } from '../../types/task';
-import { uploadFile } from '../../lib/storage';
-import { Timestamp } from 'firebase/firestore';
 
 interface AttachmentSectionProps {
   attachments: FileAttachment[];
@@ -33,18 +33,23 @@ export function AttachmentSection({
   disabled = false,
 }: AttachmentSectionProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
+    {}
+  );
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlTitle, setUrlTitle] = useState('');
   const [urlDescription, setUrlDescription] = useState('');
   const [activeTab, setActiveTab] = useState<'files' | 'urls'>('files');
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (files: FileList | null, source: 'camera' | 'gallery' | 'file') => {
+  const handleFileUpload = async (
+    files: FileList | null,
+    _source: 'camera' | 'gallery' | 'file'
+  ) => {
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
@@ -53,23 +58,27 @@ export function AttachmentSection({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileId = `${Date.now()}-${Math.random()}`;
-      
+
       try {
         setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
 
         // 파일 업로드
-        const uploadResult = await uploadFile(file, `task-attachments/${fileId}`, (progress) => {
-          setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
-        });
+        const uploadResult = await uploadFile(
+          file,
+          `task-attachments/${fileId}`,
+          progress => {
+            setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
+          }
+        );
 
         // 이미지인지 확인
         const isImage = file.type.startsWith('image/');
         let width, height;
-        
+
         if (isImage) {
-          const img = new Image();
+          const img = new window.Image();
           img.src = URL.createObjectURL(file);
-          await new Promise((resolve) => {
+          await new Promise(resolve => {
             img.onload = () => {
               width = img.width;
               height = img.height;
@@ -95,7 +104,7 @@ export function AttachmentSection({
 
         newAttachments.push(attachment);
       } catch (error) {
-        console.error('File upload failed:', error);
+        logger.error('task', 'File upload failed', error);
         // 에러 처리
       }
     }
@@ -114,7 +123,7 @@ export function AttachmentSection({
 
     const urlId = `${Date.now()}-${Math.random()}`;
     const domain = new URL(urlInput).hostname;
-    
+
     const newUrl: UrlAttachment = {
       id: urlId,
       url: urlInput.trim(),
@@ -281,7 +290,7 @@ export function AttachmentSection({
                 첨부된 파일 ({attachments.length})
               </Typography.Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {attachments.map((attachment) => (
+                {attachments.map(attachment => (
                   <div
                     key={attachment.id}
                     className="flex items-center gap-3 p-3 bg-white/10 rounded-lg border border-white/20"
@@ -326,7 +335,7 @@ export function AttachmentSection({
             type="file"
             accept="image/*"
             capture="environment"
-            onChange={(e) => handleFileUpload(e.target.files, 'camera')}
+            onChange={e => handleFileUpload(e.target.files, 'camera')}
             className="hidden"
           />
           <input
@@ -334,14 +343,14 @@ export function AttachmentSection({
             type="file"
             accept="image/*"
             multiple
-            onChange={(e) => handleFileUpload(e.target.files, 'gallery')}
+            onChange={e => handleFileUpload(e.target.files, 'gallery')}
             className="hidden"
           />
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            onChange={(e) => handleFileUpload(e.target.files, 'file')}
+            onChange={e => handleFileUpload(e.target.files, 'file')}
             className="hidden"
           />
         </div>
@@ -375,12 +384,12 @@ export function AttachmentSection({
                 <input
                   type="url"
                   value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
+                  onChange={e => setUrlInput(e.target.value)}
                   placeholder="https://example.com"
                   className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-blue-400"
                 />
               </div>
-              
+
               <div>
                 <Typography.Label className="text-white mb-2 block">
                   제목 (선택사항)
@@ -388,19 +397,19 @@ export function AttachmentSection({
                 <input
                   type="text"
                   value={urlTitle}
-                  onChange={(e) => setUrlTitle(e.target.value)}
+                  onChange={e => setUrlTitle(e.target.value)}
                   placeholder="링크 제목"
                   className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-blue-400"
                 />
               </div>
-              
+
               <div>
                 <Typography.Label className="text-white mb-2 block">
                   설명 (선택사항)
                 </Typography.Label>
                 <textarea
                   value={urlDescription}
-                  onChange={(e) => setUrlDescription(e.target.value)}
+                  onChange={e => setUrlDescription(e.target.value)}
                   placeholder="링크에 대한 설명"
                   rows={2}
                   className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-blue-400 resize-none"
@@ -440,7 +449,7 @@ export function AttachmentSection({
                 추가된 URL ({urls.length})
               </Typography.Label>
               <div className="space-y-3">
-                {urls.map((url) => (
+                {urls.map(url => (
                   <div
                     key={url.id}
                     className="p-4 bg-white/10 rounded-lg border border-white/20"
@@ -448,7 +457,10 @@ export function AttachmentSection({
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <Link size={16} className="text-blue-400 flex-shrink-0" />
+                          <Link
+                            size={16}
+                            className="text-blue-400 flex-shrink-0"
+                          />
                           <a
                             href={url.url}
                             target="_blank"

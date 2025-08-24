@@ -65,6 +65,13 @@ export interface Reminder {
   sent?: boolean;
 }
 
+// New structured reminder format
+export interface StructuredReminder {
+  offsetMinutes: number; // Minutes before due date
+  method: 'push' | 'email' | 'both';
+  sent?: boolean;
+}
+
 // Location for location-based reminders
 export interface TaskLocation {
   lat: number;
@@ -147,7 +154,7 @@ export interface CreateTaskInput {
   location?: TaskLocation;
   watchers?: string[];
   mentionedUsers?: string[];
-  reminders?: Omit<Reminder, 'id'>[];
+  reminders?: StructuredReminder[];
 }
 
 // Task update input
@@ -163,7 +170,7 @@ export interface UpdateTaskInput {
   assigneeId?: string;
   recurring?: RecurringConfig;
   tags?: string[];
-  reminders?: Reminder[];
+  reminders?: (Reminder | StructuredReminder)[];
   completedAt?: Timestamp;
   completedBy?: string;
 }

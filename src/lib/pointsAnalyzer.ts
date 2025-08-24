@@ -1,3 +1,4 @@
+import logger from '@/lib/logger';
 import { anthropic, claudeConfig } from './claude';
 import { PointHistory, PointStats } from './points';
 
@@ -36,15 +37,13 @@ export class PointsAnalyzer {
     }
 
     try {
-      const recentHistories = allHistories
-        .slice(0, 10)
-        .map(h => ({
-          type: h.type,
-          amount: h.amount,
-          reason: h.reason,
-          description: h.description,
-          createdAt: h.createdAt.toDate().toISOString()
-        }));
+      const recentHistories = allHistories.slice(0, 10).map(h => ({
+        type: h.type,
+        amount: h.amount,
+        reason: h.reason,
+        description: h.description,
+        createdAt: h.createdAt.toDate().toISOString(),
+      }));
 
       const prompt = `포인트 내역을 분석하고 적절성을 평가해주세요.
 
@@ -83,10 +82,12 @@ ${JSON.stringify(recentHistories, null, 2)}
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -95,12 +96,12 @@ ${JSON.stringify(recentHistories, null, 2)}
           const analysis = JSON.parse(content.text);
           return this.validateAnalysis(analysis);
         } catch (parseError) {
-          console.error('Failed to parse analysis:', parseError);
+          logger.error('points', 'Failed to parse analysis', parseError);
           return this.getDefaultAnalysis();
         }
       }
     } catch (error) {
-      console.error('Point analysis error:', error);
+      logger.error('points', 'Point analysis error', error);
     }
 
     return this.getDefaultAnalysis();
@@ -108,7 +109,7 @@ ${JSON.stringify(recentHistories, null, 2)}
 
   async analyzeBulkPoints(
     histories: PointHistory[],
-    groupId: string
+    _groupId: string
   ): Promise<Map<string, PointAnalysis>> {
     const analysisMap = new Map<string, PointAnalysis>();
 
@@ -123,13 +124,17 @@ ${JSON.stringify(recentHistories, null, 2)}
       const prompt = `다음 포인트 내역들을 일괄 분석하고 각각의 적절성을 평가해주세요.
 
 포인트 내역들:
-${histories.map((h, i) => `
+${histories
+  .map(
+    (h, i) => `
 ${i + 1}. ID: ${h.id}
    유형: ${h.type}
    금액: ${h.amount}
    사유: ${h.reason}
    설명: ${h.description || '없음'}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 각 내역에 대해 다음 형식의 JSON 배열로 응답해주세요:
 [
@@ -146,10 +151,12 @@ ${i + 1}. ID: ${h.id}
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 2048,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -164,11 +171,11 @@ ${i + 1}. ID: ${h.id}
             });
           }
         } catch (parseError) {
-          console.error('Failed to parse bulk analysis:', parseError);
+          logger.error('points', 'Failed to parse bulk analysis', parseError);
         }
       }
     } catch (error) {
-      console.error('Bulk point analysis error:', error);
+      logger.error('points', 'Bulk point analysis error', error);
     }
 
     // Fill missing analyses with defaults
@@ -182,7 +189,7 @@ ${i + 1}. ID: ${h.id}
   }
 
   async detectAnomalies(
-    userId: string,
+    _userId: string,
     histories: PointHistory[]
   ): Promise<string[]> {
     if (!this.isEnabled || !anthropic || histories.length === 0) {
@@ -193,9 +200,15 @@ ${i + 1}. ID: ${h.id}
       const prompt = `사용자의 포인트 획득 패턴을 분석하고 이상 징후를 감지해주세요.
 
 포인트 내역 (최근 ${histories.length}개):
-${histories.map(h => `
-- ${h.createdAt.toDate().toLocaleDateString()} ${h.type}: ${h.amount}점 (${h.reason})
-`).join('')}
+${histories
+  .map(
+    h => `
+- ${h.createdAt.toDate().toLocaleDateString()} ${h.type}: ${h.amount}점 (${
+      h.reason
+    })
+`
+  )
+  .join('')}
 
 다음과 같은 이상 패턴이 있다면 JSON 배열로 알려주세요:
 1. 비정상적으로 빈번한 포인트 획득
@@ -210,10 +223,12 @@ ${histories.map(h => `
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 512,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -226,7 +241,7 @@ ${histories.map(h => `
         }
       }
     } catch (error) {
-      console.error('Anomaly detection error:', error);
+      logger.error('points', 'Anomaly detection error', error);
     }
 
     return [];
@@ -257,10 +272,12 @@ ${histories.map(h => `
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 50,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -269,7 +286,7 @@ ${histories.map(h => `
         return isNaN(points) ? 10 : Math.max(1, Math.min(100, points));
       }
     } catch (error) {
-      console.error('Point suggestion error:', error);
+      logger.error('points', 'Point suggestion error', error);
     }
 
     return 10;
@@ -277,16 +294,24 @@ ${histories.map(h => `
 
   private validateAnalysis(analysis: any): PointAnalysis {
     return {
-      score: typeof analysis.score === 'number' ? 
-        Math.max(0, Math.min(100, analysis.score)) : 50,
-      validity: ['valid', 'suspicious', 'invalid'].includes(analysis.validity) ? 
-        analysis.validity : 'valid',
-      reasoning: typeof analysis.reasoning === 'string' ? 
-        analysis.reasoning : '분석 결과를 확인할 수 없습니다.',
-      recommendations: Array.isArray(analysis.recommendations) ? 
-        analysis.recommendations : [],
-      adjustedAmount: typeof analysis.adjustedAmount === 'number' ? 
-        analysis.adjustedAmount : undefined
+      score:
+        typeof analysis.score === 'number'
+          ? Math.max(0, Math.min(100, analysis.score))
+          : 50,
+      validity: ['valid', 'suspicious', 'invalid'].includes(analysis.validity)
+        ? analysis.validity
+        : 'valid',
+      reasoning:
+        typeof analysis.reasoning === 'string'
+          ? analysis.reasoning
+          : '분석 결과를 확인할 수 없습니다.',
+      recommendations: Array.isArray(analysis.recommendations)
+        ? analysis.recommendations
+        : [],
+      adjustedAmount:
+        typeof analysis.adjustedAmount === 'number'
+          ? analysis.adjustedAmount
+          : undefined,
     };
   }
 
@@ -295,7 +320,7 @@ ${histories.map(h => `
       score: 75,
       validity: 'valid',
       reasoning: 'AI 분석을 사용할 수 없어 기본 평가를 적용했습니다.',
-      recommendations: []
+      recommendations: [],
     };
   }
 

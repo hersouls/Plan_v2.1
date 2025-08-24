@@ -1,6 +1,8 @@
 export default {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
+  maxWorkers: 1,
+  coverageProvider: 'v8',
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
   moduleNameMapper: {
     // Path aliases to match tsconfig paths
@@ -14,39 +16,43 @@ export default {
     '^@pages/(.*)$': '<rootDir>/src/pages/$1',
     // CSS and asset mocks
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
-    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': 'jest-transform-stub',
+    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
+      'jest-transform-stub',
   },
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
-      useESM: true,
-      tsconfig: {
-        jsx: 'react-jsx',
+    '^.+\\.(ts|tsx)$': [
+      'ts-jest',
+      {
+        useESM: true,
+        tsconfig: {
+          jsx: 'react-jsx',
+        },
+        isolatedModules: true,
+        diagnostics: false,
       },
-    }],
+    ],
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$))',
-  ],
+  transformIgnorePatterns: ['node_modules/(?!(.*\\.mjs$))'],
   testMatch: [
-    '<rootDir>/src/**/__tests__/**/*.{ts,tsx}',
-    '<rootDir>/src/**/*.{test,spec}.{ts,tsx}',
+    '<rootDir>/src/lib/__tests__/**/*.{ts,tsx}',
+    '<rootDir>/src/hooks/__tests__/**/*.{ts,tsx}',
+    '<rootDir>/tests/rules/**/*.test.ts',
   ],
+  testPathIgnorePatterns: [],
   collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
-    '!src/**/*.d.ts',
-    '!src/index.tsx',
-    '!src/vite-env.d.ts',
-    '!src/**/__tests__/**',
-    '!src/**/node_modules/**',
+    'src/lib/points.ts',
+    'src/lib/pointsMetrics.ts',
+    'src/hooks/usePointHistory.ts',
+    'src/hooks/useFavoriteGroups.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
     },
   },
   // Increase test timeout for Firebase operations

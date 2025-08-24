@@ -10,6 +10,7 @@ import {
 import { FileAttachment, FileUploadProgress } from '../types/task';
 import { storage } from './firebase';
 import { getFileSizeInMB, optimizeAvatarImage } from './imageUtils';
+import logger from './logger';
 
 // 간단한 파일 업로드 함수
 export async function uploadFile(
@@ -85,21 +86,23 @@ export async function uploadAvatarImage(
   const originalSizeMB = getFileSizeInMB(file);
 
   try {
-    console.log(
+    logger.info(
+      'storage',
       `원본 이미지 크기: ${originalSizeMB.toFixed(2)}MB (용량 제한 없음)`
     );
     optimizedFile = await optimizeAvatarImage(file);
     const optimizedSizeMB = getFileSizeInMB(optimizedFile);
 
     if (originalSizeMB !== optimizedSizeMB) {
-      console.log(
+      logger.info(
+        'storage',
         `이미지 최적화 완료: ${originalSizeMB.toFixed(
           2
         )}MB → ${optimizedSizeMB.toFixed(2)}MB`
       );
     }
   } catch (error) {
-    console.error('이미지 최적화 실패:', error);
+    logger.error('storage', '이미지 최적화 실패', error);
     throw new Error('이미지 처리에 실패했습니다.');
   }
 
@@ -120,7 +123,7 @@ export async function uploadAvatarImage(
         onProgress?.(progress);
       },
       error => {
-        console.error('Avatar upload error:', error);
+        logger.error('storage', 'Avatar upload error', error);
         reject(new Error(getAvatarUploadErrorMessage(error)));
       },
       async () => {
@@ -130,7 +133,7 @@ export async function uploadAvatarImage(
             storageUrl: avatarPath,
             downloadUrl: downloadURL,
           });
-        } catch (error) {
+        } catch {
           reject(
             new Error('아바타 업로드 완료 후 URL을 가져오는데 실패했습니다.')
           );
@@ -158,7 +161,7 @@ export async function deleteAvatarImage(
     const storageRef = ref(storage, storageUrl);
     await deleteObject(storageRef);
   } catch (error) {
-    console.error('Avatar deletion error:', error);
+    logger.error('storage', 'Avatar deletion error', error);
     throw new Error('아바타 삭제에 실패했습니다.');
   }
 }
@@ -166,29 +169,30 @@ export async function deleteAvatarImage(
 /**
  * 아바타 업로드 에러 메시지 변환
  */
-function getAvatarUploadErrorMessage(error: any): string {
-  if (error.code === 'storage/unauthorized') {
+function getAvatarUploadErrorMessage(error: unknown): string {
+  const err = error as { code?: string; message?: string };
+  if (err.code === 'storage/unauthorized') {
     return '아바타 업로드 권한이 없습니다.';
-  } else if (error.code === 'storage/canceled') {
+  } else if (err.code === 'storage/canceled') {
     return '아바타 업로드가 취소되었습니다.';
-  } else if (error.code === 'storage/unknown') {
+  } else if (err.code === 'storage/unknown') {
     return '알 수 없는 오류가 발생했습니다.';
-  } else if (error.code === 'storage/quota-exceeded') {
+  } else if (err.code === 'storage/quota-exceeded') {
     return '저장 공간이 부족합니다.';
-  } else if (error.code === 'storage/unauthenticated') {
+  } else if (err.code === 'storage/unauthenticated') {
     return '인증이 필요합니다.';
-  } else if (error.code === 'storage/retry-limit-exceeded') {
+  } else if (err.code === 'storage/retry-limit-exceeded') {
     return '업로드 재시도 횟수를 초과했습니다.';
-  } else if (error.code === 'storage/invalid-checksum') {
+  } else if (err.code === 'storage/invalid-checksum') {
     return '파일이 손상되었습니다.';
-  } else if (error.code === 'storage/cannot-slice-blob') {
+  } else if (err.code === 'storage/cannot-slice-blob') {
     return '파일을 처리할 수 없습니다.';
-  } else if (error.code === 'storage/server-file-wrong-size') {
+  } else if (err.code === 'storage/server-file-wrong-size') {
     return '서버 파일 크기가 일치하지 않습니다.';
   }
 
-  console.error('Avatar upload error:', error);
-  return error.message || '아바타 업로드 중 오류가 발생했습니다.';
+  logger.error('storage', 'Avatar upload error', err);
+  return err.message || '아바타 업로드 중 오류가 발생했습니다.';
 }
 
 export interface UploadOptions {
@@ -198,7 +202,6 @@ export interface UploadOptions {
 }
 
 export class StorageService {
-  private static readonly MAX_FILE_SIZE = Number.MAX_SAFE_INTEGER; // 파일 용량 제한 없음
   private static readonly ALLOWED_IMAGE_TYPES = [
     'image/jpeg',
     'image/png',
@@ -234,15 +237,15 @@ export class StorageService {
         );
       }
 
-      console.log('현재 인증된 사용자:', currentUser.uid);
-      console.log('인증 토큰 확인 중...');
+      logger.info('storage', '현재 사용자', currentUser.uid);
+      logger.info('storage', '인증 토큰 확인 중');
 
       // 토큰 갱신 시도
       try {
         await currentUser.getIdToken(true);
-        console.log('토큰 갱신 완료');
+        logger.info('storage', '토큰 갱신 완료');
       } catch (tokenError) {
-        console.error('토큰 갱신 실패:', tokenError);
+        logger.error('storage', '토큰 갱신 실패', tokenError);
         throw new Error('인증 토큰이 만료되었습니다. 다시 로그인해주세요.');
       }
 
@@ -274,10 +277,10 @@ export class StorageService {
           });
         },
         error => {
-          console.error('Upload error details:', error);
-          console.error('Error code:', error.code);
-          console.error('Error message:', error.message);
-          console.error('Error serverResponse:', error.serverResponse);
+          logger.error('storage', 'Upload error details', error);
+          logger.error('storage', 'Error code', error.code);
+          logger.error('storage', 'Error message', error.message);
+          logger.error('storage', 'Error serverResponse', error.serverResponse);
 
           const errorMessage = this.getErrorMessage(error);
           options?.onError?.(errorMessage);
@@ -303,11 +306,8 @@ export class StorageService {
             let height: number | undefined;
 
             if (this.isImage(file.type)) {
-              const thumbnailRef = ref(
-                storage,
-                `${filePath.replace(/\.[^/.]+$/, '')}_thumb.jpg`
-              );
               // 썸네일 생성 로직은 별도로 구현 필요
+              // const thumbnailRef = ref(storage, `${filePath.replace(/\.[^/.]+$/, '')}_thumb.jpg`);
               // thumbnailURL = await this.generateThumbnail(file, thumbnailRef);
             }
 
@@ -463,7 +463,7 @@ export class StorageService {
       );
       await Promise.all(folderPromises);
     } catch (error) {
-      console.error('폴더 삭제 중 오류:', error);
+      logger.error('storage', '폴더 삭제 중 오류', error);
     }
   }
 
@@ -499,44 +499,45 @@ export class StorageService {
   /**
    * 에러 메시지 변환
    */
-  private static getErrorMessage(error: any): string {
+  private static getErrorMessage(error: unknown): string {
+    const err = error as { code?: string; message?: string };
     // CORS 오류 처리
-    if (error.message && error.message.includes('CORS')) {
-      console.error('CORS 오류 발생:', error);
+    if (err.message && err.message.includes('CORS')) {
+      logger.error('storage', 'CORS 오류 발생', err);
       return '브라우저 보안 정책으로 인해 파일 업로드가 차단되었습니다. 개발자에게 문의해주세요.';
     }
 
     // 네트워크 오류 처리
     if (
-      error.code === 'storage/network-request-failed' ||
-      error.message?.includes('ERR_FAILED')
+      err.code === 'storage/network-request-failed' ||
+      err.message?.includes('ERR_FAILED')
     ) {
-      console.error('네트워크 오류 발생:', error);
+      logger.error('storage', '네트워크 오류 발생', err);
       return '네트워크 연결을 확인하고 다시 시도해주세요.';
     }
 
-    if (error.code === 'storage/unauthorized') {
+    if (err.code === 'storage/unauthorized') {
       return '파일 접근 권한이 없습니다.';
-    } else if (error.code === 'storage/canceled') {
+    } else if (err.code === 'storage/canceled') {
       return '파일 업로드가 취소되었습니다.';
-    } else if (error.code === 'storage/unknown') {
+    } else if (err.code === 'storage/unknown') {
       return '알 수 없는 오류가 발생했습니다.';
-    } else if (error.code === 'storage/quota-exceeded') {
+    } else if (err.code === 'storage/quota-exceeded') {
       return '저장 공간이 부족합니다.';
-    } else if (error.code === 'storage/unauthenticated') {
+    } else if (err.code === 'storage/unauthenticated') {
       return '인증이 필요합니다.';
-    } else if (error.code === 'storage/retry-limit-exceeded') {
+    } else if (err.code === 'storage/retry-limit-exceeded') {
       return '업로드 재시도 횟수를 초과했습니다.';
-    } else if (error.code === 'storage/invalid-checksum') {
+    } else if (err.code === 'storage/invalid-checksum') {
       return '파일이 손상되었습니다.';
-    } else if (error.code === 'storage/cannot-slice-blob') {
+    } else if (err.code === 'storage/cannot-slice-blob') {
       return '파일을 처리할 수 없습니다.';
-    } else if (error.code === 'storage/server-file-wrong-size') {
+    } else if (err.code === 'storage/server-file-wrong-size') {
       return '서버 파일 크기가 일치하지 않습니다.';
     }
 
-    console.error('Storage 오류:', error);
-    return error.message || '파일 처리 중 오류가 발생했습니다.';
+    logger.error('storage', 'Storage 오류', err);
+    return err.message || '파일 처리 중 오류가 발생했습니다.';
   }
 
   /**

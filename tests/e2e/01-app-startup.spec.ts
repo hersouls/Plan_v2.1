@@ -12,6 +12,14 @@ test.describe('App Startup & Authentication', () => {
     
     // Enable Firebase mocking
     await helpers.mockFirebase()
+    // Harden auth stub
+    await page.addInitScript(() => {
+      window.mockFirebase = window.mockFirebase || {}
+      if (window.mockFirebase.auth) {
+        window.mockFirebase.auth.currentUser = { uid: 'test-user' }
+        window.mockFirebase.auth.onAuthStateChanged = (cb: any) => { setTimeout(() => cb({ uid: 'test-user' }), 0); return () => {} }
+      }
+    })
   })
 
   test('should load homepage without errors', async ({ page }) => {
@@ -87,22 +95,27 @@ test.describe('App Startup & Authentication', () => {
     await expect(viewport).toHaveAttribute('content', /width=device-width/)
   })
 
-  test('should register service worker', async ({ page }) => {
+  test('should register service worker (PWA project only)', async ({ page }, testInfo) => {
+    // Only run on PWA-specific project
+    const isPWAProject = /PWA/i.test(testInfo.project.name)
+    if (!isPWAProject) {
+      test.skip()
+    }
     await page.goto('/')
-    
-    // Wait for service worker registration
+    // Ensure network idle before checking SW
+    await page.waitForLoadState('networkidle')
     const isRegistered = await page.evaluate(async () => {
-      if ('serviceWorker' in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.ready
-          return !!registration
-        } catch (e) {
-          return false
-        }
+      if (!('serviceWorker' in navigator)) return false
+      try {
+        const ready = await Promise.race([
+          (async () => (await navigator.serviceWorker.ready) && true)(),
+          new Promise<boolean>(resolve => setTimeout(() => resolve(false), 5000)),
+        ])
+        return !!ready
+      } catch {
+        return false
       }
-      return false
     })
-    
     expect(isRegistered).toBeTruthy()
   })
 

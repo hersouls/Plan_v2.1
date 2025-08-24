@@ -1,35 +1,27 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import {
-  Bell,
-  Check,
-  Clock,
-  Filter,
-  MoreHorizontal,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Bell, Check, Clock, Filter, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+//
+import logger from '@/lib/logger';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { WaveBackground } from '../components/layout/WaveBackground';
 import { GlassCard } from '../components/ui/GlassCard';
 import { WaveButton } from '../components/ui/WaveButton';
 import { Typography } from '../components/ui/typography';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationService } from '../lib/notifications';
-import { Notification, NotificationStats } from '../types/notification';
 import { cn } from '../lib/utils';
+import { Notification, NotificationStats } from '../types/notification';
 
 function Notifications() {
-  const navigate = useNavigate();
+  //
   const { user } = useAuth();
-  
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [stats, setStats] = useState<NotificationStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -41,17 +33,17 @@ function Notifications() {
     const loadNotifications = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const [notificationsData, statsData] = await Promise.all([
           NotificationService.getUserNotifications(user.uid, { limit: 100 }),
           NotificationService.getNotificationStats(user.uid),
         ]);
-        
+
         setNotifications(notificationsData);
         setStats(statsData);
       } catch (err) {
-        console.error('알림 로드 실패:', err);
+        logger.error('notifications', '알림 로드 실패', err);
         setError('알림을 불러올 수 없습니다.');
       } finally {
         setLoading(false);
@@ -72,41 +64,41 @@ function Notifications() {
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await NotificationService.markAsRead(notificationId);
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notificationId 
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notificationId
             ? { ...n, status: 'read' as const, readAt: new Date() }
             : n
         )
       );
     } catch (error) {
-      console.error('알림 읽음 처리 실패:', error);
+      logger.error('notifications', '알림 읽음 처리 실패', error);
     }
   };
 
   // 모든 알림 읽음 처리
   const handleMarkAllAsRead = async () => {
     if (!user?.uid) return;
-    
+
     try {
       await NotificationService.markAllAsRead(user.uid);
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => ({ ...n, status: 'read' as const, readAt: new Date() }))
       );
     } catch (error) {
-      console.error('모든 알림 읽음 처리 실패:', error);
+      logger.error('notifications', '모든 알림 읽음 처리 실패', error);
     }
   };
 
   // 알림 삭제
   const handleDeleteNotification = async (notificationId: string) => {
     if (!confirm('이 알림을 삭제하시겠습니까?')) return;
-    
+
     try {
       await NotificationService.deleteNotification(notificationId);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (error) {
-      console.error('알림 삭제 실패:', error);
+      logger.error('notifications', '알림 삭제 실패', error);
     }
   };
 
@@ -143,7 +135,9 @@ function Notifications() {
   // 날짜 포맷팅
   const formatDate = (timestamp: any) => {
     try {
-      const date = timestamp?.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+      const date = timestamp?.seconds
+        ? new Date(timestamp.seconds * 1000)
+        : new Date(timestamp);
       const now = new Date();
       const diffTime = Math.abs(now.getTime() - date.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -164,7 +158,7 @@ function Notifications() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <LoadingSpinner size="lg" text="알림을 불러오는 중..." />
         </div>
@@ -174,7 +168,7 @@ function Notifications() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <GlassCard variant="medium" className="p-8 text-center max-w-md mx-4">
             <div className="space-y-4">
@@ -201,9 +195,7 @@ function Notifications() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-      <WaveBackground />
-
+    <div className="min-h-screen">
       <div
         className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 fixed-header-spacing"
         style={{ paddingTop: '120px' }}
@@ -234,7 +226,7 @@ function Notifications() {
               >
                 <Filter className="w-4 h-4" />
               </WaveButton>
-              
+
               {stats?.unread && stats.unread > 0 && (
                 <WaveButton
                   onClick={handleMarkAllAsRead}
@@ -257,7 +249,7 @@ function Notifications() {
               <Typography.H4 className="text-white font-pretendard text-lg">
                 필터
               </Typography.H4>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 상태 필터 */}
                 <div>
@@ -342,7 +334,8 @@ function Notifications() {
                 variant="light"
                 className={cn(
                   'p-4 transition-all duration-200 hover:shadow-lg',
-                  notification.status === 'unread' && 'border-l-4 border-blue-400 bg-blue-400/5'
+                  notification.status === 'unread' &&
+                    'border-l-4 border-blue-400 bg-blue-400/5'
                 )}
               >
                 <div className="flex items-start gap-4">
@@ -375,7 +368,9 @@ function Notifications() {
                           </button>
                         )}
                         <button
-                          onClick={() => handleDeleteNotification(notification.id)}
+                          onClick={() =>
+                            handleDeleteNotification(notification.id)
+                          }
                           className="p-1 text-white/60 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors duration-200"
                           aria-label="삭제"
                         >

@@ -4,9 +4,14 @@
 export { SettingsContainer } from './SettingsContainer';
 export { SettingsModal } from './SettingsModal';
 
+// Context
+export {
+  SettingsProvider,
+  useSettingsContext,
+} from './contexts/SettingsContext';
+
 // Hooks
-export { useSettings } from './hooks/useSettings';
-export type { UseSettingsReturn } from './hooks/useSettings';
+export { useSettingsTab } from './hooks/useSettingsTab';
 
 // Types
 export type {

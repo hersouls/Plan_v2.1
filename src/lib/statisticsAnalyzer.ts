@@ -1,7 +1,8 @@
+import logger from '@/lib/logger';
+import { GroupMember } from '../types/group';
+import { Task } from '../types/task';
 import { anthropic, claudeConfig } from './claude';
 import { PointStats } from './points';
-import { Task } from '../types/task';
-import { GroupMember } from '../types/group';
 
 export interface StatisticsInsight {
   type: 'trend' | 'pattern' | 'anomaly' | 'prediction' | 'recommendation';
@@ -53,9 +54,15 @@ export interface ActivityPattern {
 
 export class StatisticsAnalyzer {
   private isEnabled: boolean;
+  private cooldownUntil: number | null;
+  private cooldownReason: 'low_credit' | 'rate_limited' | null;
+  private hasLoggedCooldown: boolean;
 
   constructor() {
     this.isEnabled = claudeConfig.enabled && !!anthropic;
+    this.cooldownUntil = null;
+    this.cooldownReason = null;
+    this.hasLoggedCooldown = false;
   }
 
   async analyzeStatistics(
@@ -64,7 +71,7 @@ export class StatisticsAnalyzer {
     pointStats: Record<string, PointStats>,
     period: string = '30days'
   ): Promise<StatisticsInsight[]> {
-    if (!this.isEnabled || !anthropic) {
+    if (!this.isEnabled || !anthropic || this.isInCooldown()) {
       return this.getDefaultInsights();
     }
 
@@ -72,19 +79,22 @@ export class StatisticsAnalyzer {
       // 데이터 준비
       const completedTasks = tasks.filter(t => t.status === 'completed');
       const totalTasks = tasks.length;
-      const completionRate = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
+      const completionRate =
+        totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
 
       // 멤버별 통계
       const memberStats = members.map(member => ({
         name: member.userName,
-        completedTasks: completedTasks.filter(t => t.assignedTo === member.userId).length,
+        completedTasks: completedTasks.filter(
+          t => t.assigneeId === member.userId
+        ).length,
         points: pointStats[member.userId]?.totalPoints || 0,
-        streak: pointStats[member.userId]?.currentStreak || 0
+        streak: pointStats[member.userId]?.currentStreak || 0,
       }));
 
       // 카테고리별 분석
       const categoryStats = this.getCategoryDistribution(tasks);
-      
+
       // 시간대별 분석
       const timePatterns = this.getTimePatterns(completedTasks);
 
@@ -127,26 +137,35 @@ ${JSON.stringify(timePatterns, null, 2)}
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 2048,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
       if (content.type === 'text') {
         try {
           const insights = JSON.parse(content.text);
-          return Array.isArray(insights) ? 
-            insights.map(i => this.validateInsight(i)) : 
-            this.getDefaultInsights();
+          return Array.isArray(insights)
+            ? insights.map(i => this.validateInsight(i))
+            : this.getDefaultInsights();
         } catch (parseError) {
-          console.error('Failed to parse insights:', parseError);
+          logger.error(
+            'statisticsAnalyzer',
+            'Failed to parse insights',
+            parseError
+          );
           return this.getDefaultInsights();
         }
       }
     } catch (error) {
-      console.error('Statistics analysis error:', error);
+      if (this.handleAnthropicError(error, 'Statistics analysis error')) {
+        return this.getDefaultInsights();
+      }
+      logger.error('statisticsAnalyzer', 'Statistics analysis error', error);
     }
 
     return this.getDefaultInsights();
@@ -154,16 +173,19 @@ ${JSON.stringify(timePatterns, null, 2)}
 
   async predictPerformance(
     tasks: Task[],
-    historicalData: Task[],
+    _historicalData: Task[],
     targetPeriod: '1week' | '1month' | '3months'
   ): Promise<PerformancePrediction> {
-    if (!this.isEnabled || !anthropic) {
+    if (!this.isEnabled || !anthropic || this.isInCooldown()) {
       return this.getDefaultPrediction(targetPeriod);
     }
 
     try {
       const recentTasks = tasks.filter(t => {
-        const taskDate = new Date(t.createdAt);
+        const taskDate =
+          t.createdAt && (t.createdAt as any).toDate
+            ? (t.createdAt as any).toDate()
+            : new Date(t.createdAt as any);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return taskDate > thirtyDaysAgo;
@@ -200,10 +222,12 @@ ${JSON.stringify(timePatterns, null, 2)}
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 512,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -215,7 +239,10 @@ ${JSON.stringify(timePatterns, null, 2)}
         }
       }
     } catch (error) {
-      console.error('Performance prediction error:', error);
+      if (this.handleAnthropicError(error, 'Performance prediction error')) {
+        return this.getDefaultPrediction(targetPeriod);
+      }
+      logger.error('statisticsAnalyzer', 'Performance prediction error', error);
     }
 
     return this.getDefaultPrediction(targetPeriod);
@@ -226,27 +253,31 @@ ${JSON.stringify(timePatterns, null, 2)}
     tasks: Task[],
     pointStats: Record<string, PointStats>
   ): Promise<TeamAnalysis> {
-    if (!this.isEnabled || !anthropic) {
+    if (!this.isEnabled || !anthropic || this.isInCooldown()) {
       return this.getDefaultTeamAnalysis();
     }
 
     try {
       const memberPerformance = members.map(member => {
-        const memberTasks = tasks.filter(t => t.assignedTo === member.userId);
-        const completedTasks = memberTasks.filter(t => t.status === 'completed');
+        const memberTasks = tasks.filter(t => t.assigneeId === member.userId);
+        const completedTasks = memberTasks.filter(
+          t => t.status === 'completed'
+        );
         const stats = pointStats[member.userId];
-        
+
         return {
           id: member.userId,
           name: member.userName,
           role: member.role,
           tasksAssigned: memberTasks.length,
           tasksCompleted: completedTasks.length,
-          completionRate: memberTasks.length > 0 ? 
-            (completedTasks.length / memberTasks.length) * 100 : 0,
+          completionRate:
+            memberTasks.length > 0
+              ? (completedTasks.length / memberTasks.length) * 100
+              : 0,
           points: stats?.totalPoints || 0,
           streak: stats?.currentStreak || 0,
-          avgCompletionTime: this.calculateAvgCompletionTime(completedTasks)
+          avgCompletionTime: this.calculateAvgCompletionTime(completedTasks),
         };
       });
 
@@ -289,10 +320,12 @@ ${JSON.stringify(memberPerformance, null, 2)}
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 1536,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -304,7 +337,10 @@ ${JSON.stringify(memberPerformance, null, 2)}
         }
       }
     } catch (error) {
-      console.error('Team analysis error:', error);
+      if (this.handleAnthropicError(error, 'Team analysis error')) {
+        return this.getDefaultTeamAnalysis();
+      }
+      logger.error('statisticsAnalyzer', 'Team analysis error', error);
     }
 
     return this.getDefaultTeamAnalysis();
@@ -314,12 +350,12 @@ ${JSON.stringify(memberPerformance, null, 2)}
     tasks: Task[],
     userId: string
   ): Promise<ActivityPattern> {
-    if (!this.isEnabled || !anthropic) {
+    if (!this.isEnabled || !anthropic || this.isInCooldown()) {
       return this.getDefaultActivityPattern();
     }
 
     try {
-      const userTasks = tasks.filter(t => t.assignedTo === userId);
+      const userTasks = tasks.filter(t => t.assigneeId === userId);
       const completedTasks = userTasks.filter(t => t.status === 'completed');
 
       // 시간대별 분석
@@ -351,10 +387,12 @@ ${JSON.stringify(memberPerformance, null, 2)}
       const response = await anthropic.messages.create({
         model: claudeConfig.model,
         max_tokens: 512,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
       });
 
       const content = response.content[0];
@@ -366,7 +404,16 @@ ${JSON.stringify(memberPerformance, null, 2)}
         }
       }
     } catch (error) {
-      console.error('Activity pattern detection error:', error);
+      if (
+        this.handleAnthropicError(error, 'Activity pattern detection error')
+      ) {
+        return this.getDefaultActivityPattern();
+      }
+      logger.error(
+        'statisticsAnalyzer',
+        'Activity pattern detection error',
+        error
+      );
     }
 
     return this.getDefaultActivityPattern();
@@ -374,19 +421,31 @@ ${JSON.stringify(memberPerformance, null, 2)}
 
   private validateInsight(insight: any): StatisticsInsight {
     return {
-      type: ['trend', 'pattern', 'anomaly', 'prediction', 'recommendation'].includes(insight.type) ? 
-        insight.type : 'recommendation',
+      type: [
+        'trend',
+        'pattern',
+        'anomaly',
+        'prediction',
+        'recommendation',
+      ].includes(insight.type)
+        ? insight.type
+        : 'recommendation',
       title: typeof insight.title === 'string' ? insight.title : '인사이트',
-      description: typeof insight.description === 'string' ? 
-        insight.description : '분석 결과를 확인해주세요.',
-      confidence: typeof insight.confidence === 'number' ? 
-        Math.max(0, Math.min(100, insight.confidence)) : 75,
-      priority: ['low', 'medium', 'high'].includes(insight.priority) ? 
-        insight.priority : 'medium',
-      actionable: typeof insight.actionable === 'boolean' ? 
-        insight.actionable : false,
+      description:
+        typeof insight.description === 'string'
+          ? insight.description
+          : '분석 결과를 확인해주세요.',
+      confidence:
+        typeof insight.confidence === 'number'
+          ? Math.max(0, Math.min(100, insight.confidence))
+          : 75,
+      priority: ['low', 'medium', 'high'].includes(insight.priority)
+        ? insight.priority
+        : 'medium',
+      actionable:
+        typeof insight.actionable === 'boolean' ? insight.actionable : false,
       actions: Array.isArray(insight.actions) ? insight.actions : undefined,
-      data: insight.data
+      data: insight.data,
     };
   }
 
@@ -398,8 +457,8 @@ ${JSON.stringify(memberPerformance, null, 2)}
         description: 'Claude AI를 활용한 상세 분석이 가능합니다.',
         confidence: 100,
         priority: 'low',
-        actionable: false
-      }
+        actionable: false,
+      },
     ];
   }
 
@@ -409,7 +468,7 @@ ${JSON.stringify(memberPerformance, null, 2)}
       predictedCompletion: 0,
       predictedPoints: 0,
       confidence: 0,
-      factors: ['AI 분석을 사용할 수 없습니다']
+      factors: ['AI 분석을 사용할 수 없습니다'],
     };
   }
 
@@ -421,7 +480,7 @@ ${JSON.stringify(memberPerformance, null, 2)}
       opportunities: [],
       threats: [],
       topPerformers: [],
-      needsSupport: []
+      needsSupport: [],
     };
   }
 
@@ -432,7 +491,7 @@ ${JSON.stringify(memberPerformance, null, 2)}
       avgCompletionTime: 0,
       preferredCategories: [],
       collaborationScore: 0,
-      consistencyScore: 0
+      consistencyScore: 0,
     };
   }
 
@@ -450,7 +509,10 @@ ${JSON.stringify(memberPerformance, null, 2)}
     const patterns: Record<number, number> = {};
     tasks.forEach(task => {
       if (task.completedAt) {
-        const hour = new Date(task.completedAt).getHours();
+        const date = (task.completedAt as any)?.toDate
+          ? (task.completedAt as any).toDate()
+          : new Date(task.completedAt as any);
+        const hour = date.getHours();
         patterns[hour] = (patterns[hour] || 0) + 1;
       }
     });
@@ -461,7 +523,7 @@ ${JSON.stringify(memberPerformance, null, 2)}
     const completed = tasks.filter(t => t.status === 'completed').length;
     const total = tasks.length;
     const rate = total > 0 ? (completed / total) * 100 : 0;
-    
+
     if (rate >= 80) return '매우 좋음';
     if (rate >= 60) return '좋음';
     if (rate >= 40) return '보통';
@@ -480,11 +542,17 @@ ${JSON.stringify(memberPerformance, null, 2)}
     const timeDiffs = tasks
       .filter(t => t.createdAt && t.completedAt)
       .map(t => {
-        const created = new Date(t.createdAt).getTime();
-        const completed = new Date(t.completedAt!).getTime();
+        const createdDate = (t.createdAt as any)?.toDate
+          ? (t.createdAt as any).toDate()
+          : new Date(t.createdAt as any);
+        const completedDate = (t.completedAt as any)?.toDate
+          ? (t.completedAt as any).toDate()
+          : new Date(t.completedAt as any);
+        const created = createdDate.getTime();
+        const completed = completedDate.getTime();
         return (completed - created) / (1000 * 60); // 분 단위
       });
-    
+
     if (timeDiffs.length === 0) return 0;
     return timeDiffs.reduce((a, b) => a + b, 0) / timeDiffs.length;
   }
@@ -493,7 +561,10 @@ ${JSON.stringify(memberPerformance, null, 2)}
     const distribution: Record<number, number> = {};
     tasks.forEach(task => {
       if (task.completedAt) {
-        const hour = new Date(task.completedAt).getHours();
+        const date = (task.completedAt as any)?.toDate
+          ? (task.completedAt as any).toDate()
+          : new Date(task.completedAt as any);
+        const hour = date.getHours();
         distribution[hour] = (distribution[hour] || 0) + 1;
       }
     });
@@ -503,10 +574,13 @@ ${JSON.stringify(memberPerformance, null, 2)}
   private getDayDistribution(tasks: Task[]): Record<string, number> {
     const distribution: Record<string, number> = {};
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    
+
     tasks.forEach(task => {
       if (task.completedAt) {
-        const dayIndex = new Date(task.completedAt).getDay();
+        const date = (task.completedAt as any)?.toDate
+          ? (task.completedAt as any).toDate()
+          : new Date(task.completedAt as any);
+        const dayIndex = date.getDay();
         const dayName = days[dayIndex];
         distribution[dayName] = (distribution[dayName] || 0) + 1;
       }
@@ -519,7 +593,72 @@ ${JSON.stringify(memberPerformance, null, 2)}
   }
 
   isAvailable(): boolean {
-    return this.isEnabled;
+    return this.isEnabled && !this.isInCooldown();
+  }
+
+  getUnavailableReason(): 'disabled' | 'cooldown' | null {
+    if (!this.isEnabled) return 'disabled';
+    if (this.isInCooldown()) return 'cooldown';
+    return null;
+  }
+
+  private isInCooldown(): boolean {
+    return this.cooldownUntil !== null && Date.now() < this.cooldownUntil;
+  }
+
+  private startCooldown(
+    minutes: number,
+    reason: 'low_credit' | 'rate_limited'
+  ) {
+    this.cooldownUntil = Date.now() + minutes * 60 * 1000;
+    this.cooldownReason = reason;
+    this.hasLoggedCooldown = false;
+  }
+
+  private handleAnthropicError(error: unknown, context: string): boolean {
+    // returns true if handled and should fallback
+    try {
+      const asAny = error as any;
+      const status: number | undefined = asAny?.status || asAny?.code;
+      const raw = typeof asAny?.error === 'string' ? asAny.error : undefined;
+      const message: string =
+        asAny?.message || asAny?.error?.message || raw || String(error);
+
+      const messageLower = (message || '').toLowerCase();
+
+      // Low credit (400 invalid_request_error)
+      if (
+        status === 400 &&
+        (messageLower.includes('credit balance is too low') ||
+          messageLower.includes('invalid_request_error'))
+      ) {
+        this.startCooldown(15, 'low_credit');
+        if (!this.hasLoggedCooldown) {
+          logger.warn(
+            'statisticsAnalyzer',
+            `${context}: Anthropic 저크레딧으로 15분 쿨다운 시작`
+          );
+          this.hasLoggedCooldown = true;
+        }
+        return true;
+      }
+
+      // Rate limited
+      if (status === 429 || messageLower.includes('rate limit')) {
+        this.startCooldown(1, 'rate_limited');
+        if (!this.hasLoggedCooldown) {
+          logger.warn(
+            'statisticsAnalyzer',
+            `${context}: 레이트 리밋으로 1분 쿨다운 시작`
+          );
+          this.hasLoggedCooldown = true;
+        }
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
   }
 }
 

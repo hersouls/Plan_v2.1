@@ -28,8 +28,4 @@ export type {
   UsePaginationReturn,
 } from './usePagination';
 
-export type {
-  NotificationData,
-  NotificationPermissionState,
-  UseNotificationsReturn,
-} from './useNotifications';
+// useNotifications는 훅만 노출 (내부 타입은 노출하지 않음)

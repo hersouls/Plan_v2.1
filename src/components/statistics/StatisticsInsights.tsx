@@ -1,32 +1,32 @@
-import { useState, useEffect } from 'react';
-import { 
-  Brain, 
-  TrendingUp, 
-  AlertTriangle, 
-  Lightbulb, 
-  Target,
+import logger from '@/lib/logger';
+import {
   Activity,
-  ChevronRight,
-  RefreshCw,
-  X,
-  Users,
+  AlertTriangle,
   Award,
-  Calendar
+  Brain,
+  ChevronRight,
+  Lightbulb,
+  Play,
+  RefreshCw,
+  Target,
+  TrendingUp,
+  X,
 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { PointStats } from '../../lib/points';
+import {
+  ActivityPattern,
+  PerformancePrediction,
+  StatisticsInsight,
+  TeamAnalysis,
+  statisticsAnalyzer,
+} from '../../lib/statisticsAnalyzer';
+import { GroupMember } from '../../types/group';
+import { Task } from '../../types/task';
+import { LoadingSpinner } from '../common/LoadingSpinner';
 import { GlassCard } from '../ui/GlassCard';
 import { WaveButton } from '../ui/WaveButton';
 import { Typography } from '../ui/typography';
-import { LoadingSpinner } from '../common/LoadingSpinner';
-import { 
-  statisticsAnalyzer, 
-  StatisticsInsight,
-  PerformancePrediction,
-  TeamAnalysis,
-  ActivityPattern
-} from '../../lib/statisticsAnalyzer';
-import { Task } from '../../types/task';
-import { GroupMember } from '../../types/group';
-import { PointStats } from '../../lib/points';
 
 interface StatisticsInsightsProps {
   tasks: Task[];
@@ -43,23 +43,24 @@ export function StatisticsInsights({
   pointStats,
   period = '30days',
   userId,
-  onRefresh
+  onRefresh,
 }: StatisticsInsightsProps) {
   const [insights, setInsights] = useState<StatisticsInsight[]>([]);
-  const [prediction, setPrediction] = useState<PerformancePrediction | null>(null);
+  const [prediction, setPrediction] = useState<PerformancePrediction | null>(
+    null
+  );
   const [teamAnalysis, setTeamAnalysis] = useState<TeamAnalysis | null>(null);
-  const [activityPattern, setActivityPattern] = useState<ActivityPattern | null>(null);
+  const [activityPattern, setActivityPattern] =
+    useState<ActivityPattern | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedInsight, setSelectedInsight] = useState<StatisticsInsight | null>(null);
-  const [activeTab, setActiveTab] = useState<'insights' | 'prediction' | 'team' | 'pattern'>('insights');
+  const [selectedInsight, setSelectedInsight] =
+    useState<StatisticsInsight | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    'insights' | 'prediction' | 'team' | 'pattern'
+  >('insights');
+  const [started, setStarted] = useState(false);
 
-  useEffect(() => {
-    if (statisticsAnalyzer.isAvailable()) {
-      loadInsights();
-    }
-  }, [tasks, members, pointStats, period]);
-
-  const loadInsights = async () => {
+  const loadInsights = useCallback(async () => {
     setLoading(true);
     try {
       // 기본 인사이트 로드
@@ -96,11 +97,15 @@ export function StatisticsInsights({
         setActivityPattern(patternData);
       }
     } catch (error) {
-      console.error('인사이트 로드 실패:', error);
+      logger.error('statistics', '인사이트 로드 실패', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [tasks, members, pointStats, period, userId]);
+
+  useEffect(() => {
+    // 자동 실행 제거: 사용자가 명시적으로 시작 버튼을 눌렀을 때만 실행
+  }, [loadInsights]);
 
   const getInsightIcon = (type: string) => {
     switch (type) {
@@ -158,9 +163,17 @@ export function StatisticsInsights({
           </div>
           <Typography.H4 className="text-white">AI 인사이트</Typography.H4>
         </div>
-        <Typography.Body className="text-white/70">
-          Claude AI 설정이 필요합니다. API 키를 설정하면 상세한 통계 분석을 받아보실 수 있습니다.
-        </Typography.Body>
+        {statisticsAnalyzer.getUnavailableReason() === 'cooldown' ? (
+          <Typography.Body className="text-white/70">
+            현재 AI 분석이 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해
+            주세요.
+          </Typography.Body>
+        ) : (
+          <Typography.Body className="text-white/70">
+            Claude AI 설정이 필요합니다. API 키를 설정하면 상세한 통계 분석을
+            받아보실 수 있습니다.
+          </Typography.Body>
+        )}
       </GlassCard>
     );
   }
@@ -183,18 +196,39 @@ export function StatisticsInsights({
               </Typography.Caption>
             </div>
           </div>
-          <WaveButton
-            onClick={() => {
-              loadInsights();
-              onRefresh?.();
-            }}
-            variant="ghost"
-            size="sm"
-            disabled={loading}
-            className="text-white hover:bg-white/10"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </WaveButton>
+          {!started ? (
+            <WaveButton
+              onClick={() => {
+                setStarted(true);
+                loadInsights();
+                onRefresh?.();
+              }}
+              variant="ghost"
+              size="sm"
+              disabled={loading || !statisticsAnalyzer.isAvailable()}
+              className="text-white hover:bg-white/10"
+            >
+              <div className="flex items-center gap-2">
+                <Play className="w-4 h-4" />
+                <span>통계 분석 시작</span>
+              </div>
+            </WaveButton>
+          ) : (
+            <WaveButton
+              onClick={() => {
+                loadInsights();
+                onRefresh?.();
+              }}
+              variant="ghost"
+              size="sm"
+              disabled={loading}
+              className="text-white hover:bg-white/10"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+              />
+            </WaveButton>
+          )}
         </div>
 
         {/* 탭 네비게이션 */}
@@ -243,7 +277,27 @@ export function StatisticsInsights({
           )}
         </div>
 
-        {loading ? (
+        {!started && !loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Typography.Body className="text-white/80 mb-4">
+              AI 통계 분석을 시작하려면 아래 버튼을 클릭하세요.
+            </Typography.Body>
+            <WaveButton
+              onClick={() => {
+                setStarted(true);
+                loadInsights();
+                onRefresh?.();
+              }}
+              className="bg-white/10 text-white hover:bg-white/20"
+              disabled={!statisticsAnalyzer.isAvailable()}
+            >
+              <div className="flex items-center gap-2">
+                <Play className="w-4 h-4" />
+                <span>통계 분석 시작</span>
+              </div>
+            </WaveButton>
+          </div>
+        ) : loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <LoadingSpinner />
             <Typography.Body className="text-white/70 mt-4">
@@ -262,7 +316,11 @@ export function StatisticsInsights({
                     onClick={() => setSelectedInsight(insight)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 bg-gradient-to-br ${getInsightColor(insight.type)} rounded-full flex items-center justify-center flex-shrink-0`}>
+                      <div
+                        className={`w-10 h-10 bg-gradient-to-br ${getInsightColor(
+                          insight.type
+                        )} rounded-full flex items-center justify-center flex-shrink-0`}
+                      >
                         {getInsightIcon(insight.type)}
                       </div>
                       <div className="flex-1">
@@ -270,9 +328,16 @@ export function StatisticsInsights({
                           <Typography.Body className="font-semibold text-white">
                             {insight.title}
                           </Typography.Body>
-                          <span className={`px-2 py-0.5 text-xs rounded-full border ${getPriorityColor(insight.priority)}`}>
-                            {insight.priority === 'high' ? '높음' : 
-                             insight.priority === 'medium' ? '중간' : '낮음'}
+                          <span
+                            className={`px-2 py-0.5 text-xs rounded-full border ${getPriorityColor(
+                              insight.priority
+                            )}`}
+                          >
+                            {insight.priority === 'high'
+                              ? '높음'
+                              : insight.priority === 'medium'
+                              ? '중간'
+                              : '낮음'}
                           </span>
                         </div>
                         <Typography.Caption className="text-white/70 line-clamp-2">
@@ -281,7 +346,7 @@ export function StatisticsInsights({
                         <div className="flex items-center justify-between mt-2">
                           <div className="flex items-center gap-2">
                             <div className="w-24 bg-white/20 rounded-full h-1">
-                              <div 
+                              <div
                                 className="bg-gradient-to-r from-blue-400 to-purple-600 h-1 rounded-full"
                                 style={{ width: `${insight.confidence}%` }}
                               />
@@ -313,23 +378,29 @@ export function StatisticsInsights({
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <Typography.Caption className="text-white/70">예상 완료 할일</Typography.Caption>
+                      <Typography.Caption className="text-white/70">
+                        예상 완료 할일
+                      </Typography.Caption>
                       <Typography.H3 className="text-2xl font-bold text-green-400">
                         {prediction.predictedCompletion}개
                       </Typography.H3>
                     </div>
                     <div>
-                      <Typography.Caption className="text-white/70">예상 획득 포인트</Typography.Caption>
+                      <Typography.Caption className="text-white/70">
+                        예상 획득 포인트
+                      </Typography.Caption>
                       <Typography.H3 className="text-2xl font-bold text-yellow-400">
                         {prediction.predictedPoints}점
                       </Typography.H3>
                     </div>
                   </div>
                   <div className="mt-4">
-                    <Typography.Caption className="text-white/70">예측 신뢰도</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      예측 신뢰도
+                    </Typography.Caption>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="flex-1 bg-white/20 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-gradient-to-r from-green-400 to-emerald-600 h-2 rounded-full"
                           style={{ width: `${prediction.confidence}%` }}
                         />
@@ -341,12 +412,16 @@ export function StatisticsInsights({
                   </div>
                   {prediction.factors.length > 0 && (
                     <div className="mt-4">
-                      <Typography.Caption className="text-white/70 mb-2">영향 요인</Typography.Caption>
+                      <Typography.Caption className="text-white/70 mb-2">
+                        영향 요인
+                      </Typography.Caption>
                       <ul className="space-y-1">
                         {prediction.factors.map((factor, index) => (
                           <li key={index} className="flex items-start gap-2">
                             <span className="text-green-400 mt-1">•</span>
-                            <Typography.Caption className="text-white/90">{factor}</Typography.Caption>
+                            <Typography.Caption className="text-white/90">
+                              {factor}
+                            </Typography.Caption>
                           </li>
                         ))}
                       </ul>
@@ -361,44 +436,64 @@ export function StatisticsInsights({
               <div className="space-y-4">
                 {/* 전체 점수 */}
                 <div className="text-center p-6 bg-gradient-to-br from-purple-500/10 to-indigo-600/10 rounded-lg">
-                  <Typography.Caption className="text-white/70">팀 성과 점수</Typography.Caption>
+                  <Typography.Caption className="text-white/70">
+                    팀 성과 점수
+                  </Typography.Caption>
                   <Typography.H1 className="text-5xl font-bold text-white mt-2">
                     {teamAnalysis.overallScore}
                   </Typography.H1>
-                  <Typography.Caption className="text-white/50">/ 100</Typography.Caption>
+                  <Typography.Caption className="text-white/50">
+                    / 100
+                  </Typography.Caption>
                 </div>
 
                 {/* SWOT 분석 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                    <Typography.Body className="font-semibold text-green-400 mb-2">강점</Typography.Body>
+                    <Typography.Body className="font-semibold text-green-400 mb-2">
+                      강점
+                    </Typography.Body>
                     <ul className="space-y-1">
                       {teamAnalysis.strengths.map((item, index) => (
-                        <li key={index} className="text-white/80 text-sm">• {item}</li>
+                        <li key={index} className="text-white/80 text-sm">
+                          • {item}
+                        </li>
                       ))}
                     </ul>
                   </div>
                   <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
-                    <Typography.Body className="font-semibold text-red-400 mb-2">약점</Typography.Body>
+                    <Typography.Body className="font-semibold text-red-400 mb-2">
+                      약점
+                    </Typography.Body>
                     <ul className="space-y-1">
                       {teamAnalysis.weaknesses.map((item, index) => (
-                        <li key={index} className="text-white/80 text-sm">• {item}</li>
+                        <li key={index} className="text-white/80 text-sm">
+                          • {item}
+                        </li>
                       ))}
                     </ul>
                   </div>
                   <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                    <Typography.Body className="font-semibold text-blue-400 mb-2">기회</Typography.Body>
+                    <Typography.Body className="font-semibold text-blue-400 mb-2">
+                      기회
+                    </Typography.Body>
                     <ul className="space-y-1">
                       {teamAnalysis.opportunities.map((item, index) => (
-                        <li key={index} className="text-white/80 text-sm">• {item}</li>
+                        <li key={index} className="text-white/80 text-sm">
+                          • {item}
+                        </li>
                       ))}
                     </ul>
                   </div>
                   <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                    <Typography.Body className="font-semibold text-yellow-400 mb-2">위협</Typography.Body>
+                    <Typography.Body className="font-semibold text-yellow-400 mb-2">
+                      위협
+                    </Typography.Body>
                     <ul className="space-y-1">
                       {teamAnalysis.threats.map((item, index) => (
-                        <li key={index} className="text-white/80 text-sm">• {item}</li>
+                        <li key={index} className="text-white/80 text-sm">
+                          • {item}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -409,14 +504,23 @@ export function StatisticsInsights({
                   <div className="p-4 bg-white/5 rounded-lg">
                     <div className="flex items-center gap-2 mb-3">
                       <Award className="w-5 h-5 text-yellow-400" />
-                      <Typography.Body className="font-semibold text-white">우수 성과자</Typography.Body>
+                      <Typography.Body className="font-semibold text-white">
+                        우수 성과자
+                      </Typography.Body>
                     </div>
                     <div className="space-y-2">
                       {teamAnalysis.topPerformers.map((performer, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-white/5 rounded">
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-2 bg-white/5 rounded"
+                        >
                           <div>
-                            <Typography.Body className="text-white">{performer.userName}</Typography.Body>
-                            <Typography.Caption className="text-white/60">{performer.reason}</Typography.Caption>
+                            <Typography.Body className="text-white">
+                              {performer.userName}
+                            </Typography.Body>
+                            <Typography.Caption className="text-white/60">
+                              {performer.reason}
+                            </Typography.Caption>
                           </div>
                           <Typography.Body className="text-yellow-400 font-bold">
                             {performer.score}점
@@ -434,37 +538,51 @@ export function StatisticsInsights({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-white/5 rounded-lg">
-                    <Typography.Caption className="text-white/70">최고 활동 시간</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      최고 활동 시간
+                    </Typography.Caption>
                     <Typography.Body className="text-white font-semibold mt-1">
                       {activityPattern.peakHours.map(h => `${h}시`).join(', ')}
                     </Typography.Body>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
-                    <Typography.Caption className="text-white/70">최고 활동 요일</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      최고 활동 요일
+                    </Typography.Caption>
                     <Typography.Body className="text-white font-semibold mt-1">
                       {activityPattern.peakDays.join(', ')}
                     </Typography.Body>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
-                    <Typography.Caption className="text-white/70">평균 완료 시간</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      평균 완료 시간
+                    </Typography.Caption>
                     <Typography.Body className="text-white font-semibold mt-1">
                       {Math.round(activityPattern.avgCompletionTime)}분
                     </Typography.Body>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
-                    <Typography.Caption className="text-white/70">선호 카테고리</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      선호 카테고리
+                    </Typography.Caption>
                     <Typography.Body className="text-white font-semibold mt-1">
-                      {activityPattern.preferredCategories.slice(0, 2).join(', ')}
+                      {activityPattern.preferredCategories
+                        .slice(0, 2)
+                        .join(', ')}
                     </Typography.Body>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
-                    <Typography.Caption className="text-white/70">협업 점수</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      협업 점수
+                    </Typography.Caption>
                     <Typography.Body className="text-white font-semibold mt-1">
                       {activityPattern.collaborationScore}점
                     </Typography.Body>
                   </div>
                   <div className="p-4 bg-white/5 rounded-lg">
-                    <Typography.Caption className="text-white/70">일관성 점수</Typography.Caption>
+                    <Typography.Caption className="text-white/70">
+                      일관성 점수
+                    </Typography.Caption>
                     <Typography.Body className="text-white font-semibold mt-1">
                       {activityPattern.consistencyScore}점
                     </Typography.Body>
@@ -479,10 +597,17 @@ export function StatisticsInsights({
       {/* 상세 인사이트 모달 */}
       {selectedInsight && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <GlassCard variant="strong" className="w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto">
+          <GlassCard
+            variant="strong"
+            className="w-full max-w-2xl p-6 max-h-[80vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 bg-gradient-to-br ${getInsightColor(selectedInsight.type)} rounded-full flex items-center justify-center`}>
+                <div
+                  className={`w-10 h-10 bg-gradient-to-br ${getInsightColor(
+                    selectedInsight.type
+                  )} rounded-full flex items-center justify-center`}
+                >
                   {getInsightIcon(selectedInsight.type)}
                 </div>
                 <Typography.H3 className="text-xl font-semibold text-white">
@@ -512,7 +637,9 @@ export function StatisticsInsights({
                   {selectedInsight.actions.map((action, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <ChevronRight className="w-4 h-4 text-blue-400 mt-0.5" />
-                      <Typography.Caption className="text-white/80">{action}</Typography.Caption>
+                      <Typography.Caption className="text-white/80">
+                        {action}
+                      </Typography.Caption>
                     </li>
                   ))}
                 </ul>
@@ -521,9 +648,17 @@ export function StatisticsInsights({
 
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
               <div className="flex items-center gap-4">
-                <span className={`px-3 py-1 text-xs rounded-full border ${getPriorityColor(selectedInsight.priority)}`}>
-                  우선순위: {selectedInsight.priority === 'high' ? '높음' : 
-                            selectedInsight.priority === 'medium' ? '중간' : '낮음'}
+                <span
+                  className={`px-3 py-1 text-xs rounded-full border ${getPriorityColor(
+                    selectedInsight.priority
+                  )}`}
+                >
+                  우선순위:{' '}
+                  {selectedInsight.priority === 'high'
+                    ? '높음'
+                    : selectedInsight.priority === 'medium'
+                    ? '중간'
+                    : '낮음'}
                 </span>
                 {selectedInsight.actionable && (
                   <span className="px-3 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
@@ -532,9 +667,11 @@ export function StatisticsInsights({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Typography.Caption className="text-white/50">신뢰도</Typography.Caption>
+                <Typography.Caption className="text-white/50">
+                  신뢰도
+                </Typography.Caption>
                 <div className="w-20 bg-white/20 rounded-full h-1">
-                  <div 
+                  <div
                     className="bg-gradient-to-r from-blue-400 to-purple-600 h-1 rounded-full"
                     style={{ width: `${selectedInsight.confidence}%` }}
                   />

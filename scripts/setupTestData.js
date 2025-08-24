@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import {
+  connectAuthEmulator,
   createUserWithEmailAndPassword,
   getAuth,
   signInWithEmailAndPassword,
@@ -7,6 +8,7 @@ import {
 import {
   addDoc,
   collection,
+  connectFirestoreEmulator,
   doc,
   getFirestore,
   serverTimestamp,
@@ -45,6 +47,31 @@ if (isDemoMode) {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+// Prefer emulators in test mode
+try {
+  const useEmu =
+    process.env.VITE_USE_FIREBASE_EMULATOR === 'true' ||
+    process.env.NODE_ENV === 'test';
+  if (useEmu) {
+    const authUrl =
+      process.env.VITE_FIREBASE_AUTH_EMULATOR_URL || 'http://localhost:9099';
+    const [fsHost, fsPortStr] = (
+      process.env.VITE_FIREBASE_FIRESTORE_EMULATOR_HOST || 'localhost:8080'
+    ).split(':');
+    const fsPort = parseInt(fsPortStr || '8080', 10);
+    connectAuthEmulator(auth, authUrl, { disableWarnings: true });
+    connectFirestoreEmulator(db, fsHost, fsPort);
+    console.log(
+      `✅ Using Firebase Emulators for setup (auth: ${authUrl}, firestore: ${fsHost}:${fsPort})`
+    );
+  }
+} catch (e) {
+  console.warn(
+    '⚠️ Failed to connect to emulators during setupTestData, continuing:',
+    e
+  );
+}
 
 // Test user accounts data
 const testUsers = [

@@ -16,8 +16,8 @@ const projectRoot = path.resolve(__dirname, '..')
 console.log('📱 Moonwave Plan PWA Validator')
 console.log('=============================')
 
-let pwaIssues = []
-let pwaPassed = []
+const pwaIssues = []
+const pwaPassed = []
 
 // Validate manifest.json
 function validateManifest() {

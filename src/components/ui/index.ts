@@ -1,5 +1,6 @@
 // UI Components
 export * from './avatar';
+export * from './avatar.utils';
 export * from './badge';
 export * from './button';
 export * from './calendar';

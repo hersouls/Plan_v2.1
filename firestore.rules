@@ -13,24 +13,36 @@ service cloud.firestore {
     
     // Simplified group functions - reduced database lookups
     function isGroupMember(groupId) {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+      // 그룹 문서의 memberIds 배열을 기준으로 멤버십 판별
+      return isAuthenticated() &&
+        request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
     }
     
     function isGroupOwner(groupId) {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/groups/$(groupId)) &&
-        request.auth.uid == resource.data.ownerId;
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.ownerId == request.auth.uid;
     }
     
     // Simplified rules for better performance - removed catch-all rule
     
     // 사용자 프로필 컬렉션 보안 규칙
     match /users/{userId} {
-      allow read: if isOwner(userId) || 
-        (isAuthenticated() && resource.data.privacy.showTaskActivity == true);
-      allow write: if isOwner(userId);
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // 소유자이거나, 해당 사용자가 프로필을 공개한 경우 그룹 구성원이 최소 필드를 읽을 수 있게 허용
+      allow read: if isOwner(userId) ||
+        (
+          isAuthenticated() &&
+          resource != null &&
+          (
+            // 기존: 작업 활동 공개
+            resource.data.privacy.showTaskActivity == true ||
+            resource.data.preferences.privacy.showTaskActivity == true ||
+            // 추가: 프로필 공개 (Settings는 settings.privacy에 저장)
+            resource.data.privacy.profileVisible == true ||
+            resource.data.preferences.privacy.profileVisible == true ||
+            resource.data.settings.privacy.profileVisible == true
+          )
+        );
+      allow create, write: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // 사용자 설정 서브컬렉션
@@ -43,16 +55,35 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && 
         request.auth.uid == request.resource.data.ownerId;
-      allow update: if isAuthenticated() && 
-        (isGroupOwner(groupId) || 
-         (isGroupMember(groupId) && 
-          resource.data.settings.allowMembersToInvite == true));
+      // Update rules: allow members to manage invites and roles per user's request
+      allow update: if isAuthenticated() && (
+        // Owner can update anything
+        isGroupOwner(groupId) ||
+        // Members can update invite code fields and memberRoles
+        (
+          isGroupMember(groupId) &&
+          request.resource.data.ownerId == resource.data.ownerId &&
+          request.resource.data.memberIds == resource.data.memberIds &&
+          // allow members to generate/update invite code fields
+          (
+            request.resource.data.inviteCode == resource.data.inviteCode ||
+            request.resource.data.inviteCode != null
+          ) &&
+          (
+            request.resource.data.inviteCodeExpiresAt == resource.data.inviteCodeExpiresAt ||
+            request.resource.data.inviteCodeExpiresAt != null
+          ) &&
+          // allow members to change memberRoles
+          request.resource.data.memberRoles != null
+        )
+      );
       allow delete: if isAuthenticated() && isGroupOwner(groupId);
       
       // 그룹 멤버 서브컬렉션
       match /members/{memberId} {
         allow read: if isGroupMember(groupId);
-        allow write: if isGroupOwner(groupId);
+        // Allow group members to update member documents as part of member-managed permissions
+        allow write: if isGroupMember(groupId);
       }
       
       // 그룹 채팅 서브컬렉션
@@ -61,31 +92,59 @@ service cloud.firestore {
         allow create: if isGroupMember(groupId) && 
           request.auth.uid == request.resource.data.userId;
         allow update, delete: if isGroupMember(groupId) && 
-          request.auth.uid == resource.data.userId;
+          request.auth.uid == request.resource.data.userId &&
+          request.resource.data.userId == resource.data.userId;
+      }
+      
+      // 타이핑 상태 서브컬렉션
+      match /typing/{userId} {
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId) && 
+          request.auth.uid == userId;
+        allow delete: if isGroupMember(groupId) && 
+          request.auth.uid == userId;
+      }
+      
+      // 채팅 메시지 읽음 상태 서브컬렉션
+      match /chat/{messageId}/reads/{userId} {
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId) && 
+          request.auth.uid == userId;
+        allow delete: if isGroupMember(groupId) && 
+          request.auth.uid == userId;
       }
     }
     
     // 할일(Task) 컬렉션 보안 규칙
     match /tasks/{taskId} {
       allow read: if isAuthenticated() && 
-        (request.auth.uid == resource.data.userId ||
-         request.auth.uid == resource.data.assigneeId ||
-         (resource.data.taskType == 'group' && resource.data.groupId != null && isGroupMember(resource.data.groupId)));
+        (
+          request.auth.uid == resource.data.userId ||
+          request.auth.uid == resource.data.assigneeId ||
+          (resource.data.groupId != null && isGroupMember(resource.data.groupId))
+        );
       
-      allow create: if isAuthenticated() && 
-        request.auth.uid == request.resource.data.userId &&
-        ((request.resource.data.taskType == 'personal') ||
-         (request.resource.data.taskType == 'group' && request.resource.data.groupId != null && isGroupMember(request.resource.data.groupId)));
+      // 생성은 생성자 본인만 가능하도록 허용 (멤버십 검사는 업데이트/읽기에서 보장)
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
       
       allow update: if isAuthenticated() && 
-        (request.auth.uid == resource.data.userId ||
-         request.auth.uid == resource.data.assigneeId ||
-         (resource.data.taskType == 'group' && resource.data.groupId != null && isGroupMember(resource.data.groupId) && 
-          resource.data.groupId == request.resource.data.groupId));
+        (
+          request.auth.uid == request.resource.data.userId ||
+          request.auth.uid == request.resource.data.assigneeId ||
+          (
+            request.resource.data.groupId != null &&
+            isGroupMember(request.resource.data.groupId)
+          )
+        ) &&
+        // 핵심 식별자 필드 불변성 보장
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.groupId == resource.data.groupId;
       
       allow delete: if isAuthenticated() && 
-        (request.auth.uid == resource.data.userId ||
-         (resource.data.taskType == 'group' && resource.data.groupId != null && isGroupOwner(resource.data.groupId)));
+        (
+          request.auth.uid == resource.data.userId ||
+          (resource.data.groupId != null && isGroupOwner(resource.data.groupId))
+        );
       
       // Simplified comments - inherit task permissions
       match /comments/{commentId} {
@@ -93,7 +152,8 @@ service cloud.firestore {
         allow create: if isAuthenticated() && 
           request.auth.uid == request.resource.data.userId;
         allow update, delete: if isAuthenticated() && 
-          request.auth.uid == resource.data.userId;
+          request.auth.uid == request.resource.data.userId &&
+          request.resource.data.userId == resource.data.userId;
       }
     }
     
@@ -101,8 +161,17 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if isOwner(resource.data.userId);
       allow create: if isAuthenticated();
-      allow update: if isOwner(resource.data.userId) && 
-        request.resource.data.read != resource.data.read; // Only allow marking as read
+      allow update: if isOwner(resource.data.userId) &&
+        // 다른 필드는 변경 불가 (읽음 처리만 허용)
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.title == resource.data.title &&
+        request.resource.data.message == resource.data.message &&
+        request.resource.data.type == resource.data.type &&
+        request.resource.data.priority == resource.data.priority &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        // status/readAt만 변경 허용. status는 읽음/읽지않음 값만 허용하고 변경이 있어야 함
+        request.resource.data.status in ['read', 'unread'] &&
+        request.resource.data.status != resource.data.status;
       allow delete: if isOwner(resource.data.userId);
     }
     
@@ -135,6 +204,13 @@ service cloud.firestore {
         request.resource.data.status != resource.data.status; // Only status change
       allow delete: if isGroupOwner(resource.data.groupId);
     }
+
+    // 코드에서 사용하는 invitations 컬렉션 규칙 추가
+    match /invitations/{inviteId} {
+      allow read: if isAuthenticated() && isGroupMember(resource.data.groupId);
+      allow create: if isAuthenticated() && isGroupMember(request.resource.data.groupId);
+      allow update, delete: if isGroupOwner(resource.data.groupId);
+    }
     
     // 포인트 내역 컬렉션 보안 규칙
     match /pointHistory/{historyId} {
@@ -145,7 +221,8 @@ service cloud.firestore {
         (request.resource.data.userId == request.auth.uid || 
          isGroupOwner(request.resource.data.groupId));
       allow update, delete: if isAuthenticated() && 
-        isGroupOwner(resource.data.groupId);
+        isGroupOwner(request.resource.data.groupId) &&
+        request.resource.data.groupId == resource.data.groupId;
     }
     
     // 포인트 규칙 컬렉션 보안 규칙
@@ -153,17 +230,26 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
         isGroupMember(resource.data.groupId);
       allow create, update, delete: if isAuthenticated() && 
-        isGroupOwner(resource.data.groupId);
+        isGroupOwner(request.resource.data.groupId);
     }
     
     // 포인트 통계 컬렉션 보안 규칙
     match /pointStats/{statsId} {
       allow read: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || 
-         isGroupMember(resource.data.groupId));
+        (
+          // statsId 형식: userId_groupId
+          (statsId.split('_')[0] == request.auth.uid) ||
+          // 문서가 존재하는 경우 데이터 기반 검증
+          (resource != null && 
+           (resource.data.userId == request.auth.uid || 
+            isGroupMember(resource.data.groupId))) ||
+          // statsId에서 groupId 추출하여 그룹 멤버 확인
+          (statsId.split('_').size() > 1 && 
+           isGroupMember(statsId.split('_')[1]))
+        );
       allow create, update: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || 
-         isGroupOwner(resource.data.groupId));
+        (request.resource.data.userId == request.auth.uid || 
+         isGroupOwner(request.resource.data.groupId));
     }
     
     // 기본 거부 규칙

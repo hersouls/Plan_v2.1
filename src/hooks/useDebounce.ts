@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import logger from '@/lib/logger';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Hook that debounces a value
@@ -22,7 +23,7 @@ export function useDebounce<T>(value: T, delay: number): T {
 /**
  * Hook that debounces a callback function
  */
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
+export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T {
@@ -34,15 +35,18 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
     callbackRef.current = callback;
   }, [callback]);
 
-  const debouncedCallback = useCallback((...args: Parameters<T>) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+  const debouncedCallback = useCallback(
+    (...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
 
-    timeoutRef.current = setTimeout(() => {
-      callbackRef.current(...args);
-    }, delay);
-  }, [delay]) as T;
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current(...args);
+      }, delay);
+    },
+    [delay]
+  ) as T;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -85,8 +89,10 @@ export function useDebouncedSearch<T>(
         const searchResults = await searchFunction(debouncedQuery);
         setResults(searchResults);
       } catch (err) {
-        console.error('Search error:', err);
-        setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.');
+        logger.error('useDebouncedSearch', 'search failed', err);
+        setError(
+          err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.'
+        );
         setResults([]);
       } finally {
         setLoading(false);
@@ -109,6 +115,6 @@ export function useDebouncedSearch<T>(
     loading,
     error,
     clearSearch,
-    clearError: () => setError(null)
+    clearError: () => setError(null),
   };
 }

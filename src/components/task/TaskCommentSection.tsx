@@ -17,8 +17,8 @@ import {
 import { Typography } from '@/components/ui/typography';
 import { cn } from '@/components/ui/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
 import { Comment, useComments } from '@/hooks/useComments';
+import logger from '@/lib/logger';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
@@ -66,7 +66,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
   onEdit,
   onDelete,
   onReaction,
-  replyToId,
   level = 0,
 }) => {
   const { user } = useAuth();
@@ -95,10 +94,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
     [comment.id, onReaction]
   );
 
-  const reactionCount = Object.values(comment.reactions || {}).reduce(
-    (total, users) => total + users.length,
-    0
-  );
+  //
 
   const userReactions = Object.entries(comment.reactions || {}).filter(
     ([_, users]) => users.includes(user?.uid || '')
@@ -122,15 +118,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-2">
-              <Typography variant="sm" className="font-medium text-gray-900">
+              <Typography.Body className="font-medium text-gray-900">
                 {comment.userName}
-              </Typography>
-              <Typography variant="xs" className="text-gray-500">
+              </Typography.Body>
+              <Typography.Caption className="text-gray-500">
                 {formatDistanceToNow(comment.createdAt.toDate(), {
                   addSuffix: true,
                   locale: ko,
                 })}
-              </Typography>
+              </Typography.Caption>
               {comment.isEdited && (
                 <Badge variant="secondary" className="text-xs">
                   수정됨
@@ -163,10 +159,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               </div>
             ) : (
               <div className="space-y-3">
-                <Typography
-                  variant="sm"
-                  className="text-gray-800 whitespace-pre-wrap"
-                >
+                <Typography.Body className="text-gray-800 whitespace-pre-wrap">
                   {comment.content.split(' ').map((word, index) => {
                     if (word.startsWith('@')) {
                       return (
@@ -177,7 +170,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                     }
                     return word + ' ';
                   })}
-                </Typography>
+                </Typography.Body>
 
                 {/* Reactions */}
                 <div className="flex items-center space-x-2">
@@ -200,7 +193,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-2" align="start">
                       <div className="flex space-x-1">
-                        {EMOJI_REACTIONS.map(({ emoji, label, icon: Icon }) => (
+                        {EMOJI_REACTIONS.map(({ emoji, label }) => (
                           <Button
                             key={emoji}
                             size="sm"
@@ -264,7 +257,6 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
   className,
 }) => {
   const { user } = useAuth();
-  const { currentGroup, groupMembers } = useData();
   const { comments, loading, error, addComment, updateComment, deleteComment } =
     useComments({
       taskId,
@@ -288,15 +280,8 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
 
       while ((match = mentionRegex.exec(commentText)) !== null) {
         const mentionedName = match[1];
-        // 그룹 멤버에서 이름으로 ID 찾기
-        const mentionedUser = groupMembers?.find(
-          member =>
-            member.displayName === mentionedName ||
-            member.email === mentionedName
-        );
-        if (mentionedUser) {
-          mentions.push(mentionedUser.id);
-        }
+        // 멤버 정보를 알 수 없는 경우 이름 문자열만 보관 (백엔드에서 해석)
+        mentions.push(mentionedName);
       }
 
       await addComment({
@@ -308,11 +293,11 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
       setCommentText('');
       setReplyToId(null);
     } catch (error) {
-      console.error('댓글 추가 실패:', error);
+      logger.error('task', '댓글 추가 실패', error);
     } finally {
       setIsSubmitting(false);
     }
-  }, [commentText, user, taskId, replyToId, addComment, groupMembers]);
+  }, [commentText, user, taskId, replyToId, addComment]);
 
   const handleReply = useCallback((commentId: string) => {
     setReplyToId(commentId);
@@ -324,7 +309,7 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
       try {
         await updateComment(commentId, { content });
       } catch (error) {
-        console.error('댓글 수정 실패:', error);
+        logger.error('task', '댓글 수정 실패', error);
       }
     },
     [updateComment]
@@ -337,7 +322,7 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
       try {
         await deleteComment(commentId);
       } catch (error) {
-        console.error('댓글 삭제 실패:', error);
+        logger.error('task', '댓글 삭제 실패', error);
       }
     },
     [deleteComment]
@@ -366,7 +351,7 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
 
         await updateComment(commentId, { reactions: newReactions });
       } catch (error) {
-        console.error('반응 추가 실패:', error);
+        logger.error('task', '반응 추가 실패', error);
       }
     },
     [comments, user?.uid, updateComment]
@@ -400,9 +385,7 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
   if (loading) {
     return (
       <div className={cn('space-y-4', className)}>
-        <Typography variant="lg" className="font-semibold">
-          댓글
-        </Typography>
+        <Typography.H4 className="font-semibold">댓글</Typography.H4>
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex space-x-3">
@@ -422,16 +405,16 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
     <div className={cn('space-y-6', className)}>
       <div className="flex items-center space-x-2">
         <MessageSquare className="w-5 h-5 text-gray-600" />
-        <Typography variant="lg" className="font-semibold">
+        <Typography.Body className="font-semibold">
           댓글 {comments.length}개
-        </Typography>
+        </Typography.Body>
       </div>
 
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <Typography variant="sm" className="text-red-600">
+          <Typography.Body className="text-red-600">
             댓글을 불러오는 중 오류가 발생했습니다.
-          </Typography>
+          </Typography.Body>
         </div>
       )}
 
@@ -493,9 +476,9 @@ export const TaskCommentSection: React.FC<TaskCommentSectionProps> = ({
         {commentTree.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <Typography variant="sm">
+            <Typography.Body>
               아직 댓글이 없습니다. 첫 번째 댓글을 작성해보세요!
-            </Typography>
+            </Typography.Body>
           </div>
         ) : (
           commentTree.map(comment => (

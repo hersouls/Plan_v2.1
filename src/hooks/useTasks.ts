@@ -1,7 +1,7 @@
-import { Timestamp } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { taskService } from '../lib/firestore';
+import logger from '../lib/logger';
 import { pointsService } from '../lib/points';
 import {
   CreateTaskInput,
@@ -96,7 +96,7 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
         return await taskService.createTask(taskData);
       } catch (err) {
         const errorMessage = '할일 생성 중 오류가 발생했습니다.';
-        console.error('Create task error:', err);
+        logger.error('useTasks', 'createTask failed', err);
         setError(errorMessage);
         throw new Error(errorMessage);
       }
@@ -113,7 +113,7 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
         await taskService.updateTask(taskId, updates);
       } catch (err) {
         const errorMessage = '할일 수정 중 오류가 발생했습니다.';
-        console.error('Update task error:', err);
+        logger.error('useTasks', 'updateTask failed', err);
         setError(errorMessage);
         throw new Error(errorMessage);
       }
@@ -130,7 +130,7 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
         await taskService.deleteTask(taskId);
       } catch (err) {
         const errorMessage = '할일 삭제 중 오류가 발생했습니다.';
-        console.error('Delete task error:', err);
+        logger.error('useTasks', 'deleteTask failed', err);
         setError(errorMessage);
         throw new Error(errorMessage);
       }
@@ -143,8 +143,13 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
       if (!user) throw new Error('인증이 필요합니다.');
 
       try {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) throw new Error('할일을 찾을 수 없습니다.');
+        let task = tasks.find(t => t.id === taskId);
+        if (!task) {
+          // 상세 화면 등 목록에 없을 수 있는 경우 Firestore에서 단건 조회
+          const fetched = await taskService.getTask(taskId);
+          if (!fetched) throw new Error('할일을 찾을 수 없습니다.');
+          task = fetched as Task;
+        }
 
         const isCompleted = task.status === 'completed';
         const newStatus = isCompleted ? 'pending' : 'completed';
@@ -152,24 +157,37 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
         setError(null);
 
         // Optimistic update - immediately update local state
-        setTasks(prevTasks =>
-          prevTasks.map(t =>
+        setTasks(prevTasks => {
+          const exists = prevTasks.some(t => t.id === taskId);
+          if (!exists) {
+            // 목록에 없던 경우 항목을 추가한 뒤 상태를 반영
+            return [
+              {
+                ...task!,
+                status: newStatus,
+                completedAt: isCompleted ? null : new Date(),
+                completedBy: isCompleted ? null : user.uid,
+              },
+              ...prevTasks,
+            ];
+          }
+          return prevTasks.map(t =>
             t.id === taskId
               ? {
                   ...t,
                   status: newStatus,
-                  completedAt: isCompleted ? undefined : Timestamp.now(),
-                  completedBy: isCompleted ? undefined : user.uid,
+                  completedAt: isCompleted ? null : new Date(),
+                  completedBy: isCompleted ? null : user.uid,
                 }
               : t
-          )
-        );
+          );
+        });
 
         try {
           await taskService.updateTask(taskId, {
             status: newStatus,
-            completedAt: isCompleted ? undefined : Timestamp.now(),
-            completedBy: isCompleted ? undefined : user.uid,
+            completedAt: isCompleted ? null : new Date(),
+            completedBy: isCompleted ? null : user.uid,
           });
 
           // 할일 완료 시 포인트 지급
@@ -182,20 +200,24 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
                 task.title
               );
             } catch (pointsError) {
-              console.error('포인트 지급 실패:', pointsError);
+              logger.error('useTasks', 'award points failed', pointsError);
               // 포인트 지급 실패는 할일 완료를 막지 않음
             }
           }
         } catch (updateError) {
           // Revert optimistic update on error
-          setTasks(prevTasks =>
-            prevTasks.map(t => (t.id === taskId ? task : t))
-          );
+          setTasks(prevTasks => {
+            const exists = prevTasks.some(t => t.id === taskId);
+            if (!exists) {
+              return prevTasks; // 목록에 없던 경우 되돌릴 필요 없음
+            }
+            return prevTasks.map(t => (t.id === taskId ? (task as Task) : t));
+          });
           throw updateError;
         }
       } catch (err) {
         const errorMessage = '할일 상태 변경 중 오류가 발생했습니다.';
-        console.error('Toggle task complete error:', err);
+        logger.error('useTasks', 'toggleTaskComplete failed', err);
         setError(errorMessage);
         throw new Error(errorMessage);
       }
@@ -213,7 +235,7 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
       setTasks(taskList);
     } catch (err) {
       const errorMessage = '할일을 새로고침하는 중 오류가 발생했습니다.';
-      console.error('Refresh tasks error:', err);
+      logger.error('useTasks', 'refresh failed', err);
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -249,25 +271,25 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
 
           if (options.filters?.status) {
             filteredTasks = filteredTasks.filter(task =>
-              options.filters!.status!.includes(task.status)
+              options.filters?.status?.includes(task.status)
             );
           }
 
           if (options.filters?.priority) {
             filteredTasks = filteredTasks.filter(task =>
-              options.filters!.priority!.includes(task.priority)
+              options.filters?.priority?.includes(task.priority)
             );
           }
 
           if (options.filters?.category) {
             filteredTasks = filteredTasks.filter(task =>
-              options.filters!.category!.includes(task.category)
+              options.filters?.category?.includes(task.category)
             );
           }
 
           if (options.filters?.assigneeId) {
             filteredTasks = filteredTasks.filter(task =>
-              options.filters!.assigneeId!.includes(task.assigneeId)
+              options.filters?.assigneeId?.includes(task.assigneeId)
             );
           }
 
@@ -277,7 +299,7 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
 
           setTasks(filteredTasks);
         } catch (err) {
-          console.error('Load initial data error:', err);
+          logger.error('useTasks', 'load initial data failed', err);
           setError('할일을 불러오는 중 오류가 발생했습니다.');
         } finally {
           setLoading(false);
@@ -291,7 +313,7 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
     let unsubscribe: (() => void) | undefined;
 
     const handleError = (error: Error) => {
-      console.error('Tasks subscription error:', error);
+      logger.error('useTasks', 'subscription error', error);
       setError('할일을 불러오는 중 오류가 발생했습니다.');
       setLoading(false);
     };
@@ -302,25 +324,25 @@ export const useTasks = (options: UseTasksOptions = {}): UseTasksReturn => {
 
       if (options.filters?.status) {
         filteredTasks = filteredTasks.filter(task =>
-          options.filters!.status!.includes(task.status)
+          options.filters?.status?.includes(task.status)
         );
       }
 
       if (options.filters?.priority) {
         filteredTasks = filteredTasks.filter(task =>
-          options.filters!.priority!.includes(task.priority)
+          options.filters?.priority?.includes(task.priority)
         );
       }
 
       if (options.filters?.category) {
         filteredTasks = filteredTasks.filter(task =>
-          options.filters!.category!.includes(task.category)
+          options.filters?.category?.includes(task.category)
         );
       }
 
       if (options.filters?.assigneeId) {
         filteredTasks = filteredTasks.filter(task =>
-          options.filters!.assigneeId!.includes(task.assigneeId)
+          options.filters?.assigneeId?.includes(task.assigneeId)
         );
       }
 

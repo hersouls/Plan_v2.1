@@ -1,11 +1,5 @@
 import React, { ReactNode } from 'react';
-import { 
-  GlassCardVariant, 
-  WaveButtonVariant, 
-  WaveButtonSize, 
-  BaseComponentProps, 
-  InteractiveComponentProps 
-} from './common';
+import { GlassCardVariant, WaveButtonSize, WaveButtonVariant } from './common';
 
 // ============================================================================
 // GLASS CARD TYPES
@@ -103,7 +97,8 @@ export interface WaveButtonSizeStyles {
 /**
  * WaveButton Props 인터페이스
  */
-export interface WaveButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface WaveButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: WaveButtonVariantType;
   size?: WaveButtonSizeType;
@@ -379,4 +374,7 @@ export type RenderFunction<T = any> = (props: T) => ReactNode;
 /**
  * 컴포넌트 ref 타입
  */
-export type ComponentRef<T> = React.RefObject<T> | ((instance: T | null) => void) | null;
+export type ComponentRef<T> =
+  | React.RefObject<T>
+  | ((instance: T | null) => void)
+  | null;

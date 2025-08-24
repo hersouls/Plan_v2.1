@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   createUserWithEmailAndPassword,
   signInAnonymously as firebaseSignInAnonymously,
@@ -13,9 +14,10 @@ import {
 } from 'firebase/auth';
 import { serverTimestamp } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { fcmService } from '../lib/fcm';
-import { auth } from '../lib/firebase';
+import { cleanupFCM, initializeFCM } from '../lib/fcmManager';
+import { auth, checkFirebaseConnection } from '../lib/firebase';
 import { userService } from '../lib/firestore';
+import logger from '../lib/logger';
 import { AuthContextType, ExtendedUser } from '../types/auth';
 import { User } from '../types/user';
 
@@ -39,19 +41,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Create initial user profile
   const createUserProfile = async (user: ExtendedUser) => {
     try {
-      if (import.meta.env.DEV) {
-        console.log('Creating/updating user profile for:', user.uid);
+      try {
+        const viteEnv = (globalThis as any)?.import?.meta?.env;
+        if (viteEnv?.DEV) {
+          logger.debug('Creating/updating user profile for:', user.uid);
+        }
+      } catch {
+        /* noop */
       }
 
       // Add safety check for userService
       if (!userService || typeof userService.getUserProfile !== 'function') {
-        console.error('userService is not properly loaded');
+        logger.error('userService is not properly loaded');
         return;
       }
 
       const existingProfile = await userService.getUserProfile(user.uid);
-      if (import.meta.env.DEV) {
-        console.log('Existing profile:', existingProfile);
+      try {
+        const viteEnv = (globalThis as any)?.import?.meta?.env;
+        if (viteEnv?.DEV) {
+          logger.debug('Existing profile:', existingProfile);
+        }
+      } catch {
+        /* noop */
       }
 
       if (!existingProfile) {
@@ -106,6 +118,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           loginCount: 1,
         };
 
+        // 디버그: 전달 키만 로깅
+        try {
+          const keys = Object.keys(initialProfile || {});
+          logger.debug('auth', 'create profile keys', {
+            userId: user.uid,
+            keys,
+          });
+        } catch {
+          /* noop */
+        }
+
+        // 토큰 갱신으로 만료 토큰 이슈 방지
+        try {
+          await auth.currentUser?.getIdToken(true);
+        } catch {
+          /* noop */
+        }
         await userService.createOrUpdateUserProfile(user.uid, initialProfile);
       } else {
         // Update login count and last login with safe data
@@ -119,22 +148,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...(user.photoURL && { photoURL: user.photoURL }),
         };
 
+        // 디버그: 전달 키만 로깅
+        try {
+          const keys = Object.keys(updateData || {});
+          logger.debug('auth', 'update profile keys', {
+            userId: user.uid,
+            keys,
+          });
+        } catch {
+          /* noop */
+        }
+
+        // 토큰 갱신으로 만료 토큰 이슈 방지
+        try {
+          await auth.currentUser?.getIdToken(true);
+        } catch {
+          /* noop */
+        }
         await userService.createOrUpdateUserProfile(user.uid, updateData);
       }
     } catch (error) {
-      console.error('Error creating/updating user profile:', error);
+      logger.error('Error creating/updating user profile:', error);
     }
   };
 
   useEffect(() => {
     // Firebase auth 객체가 제대로 초기화되었는지 확인
     if (!auth) {
-      console.error('Firebase auth is not initialized');
+      logger.error('Firebase auth is not initialized');
       setLoading(false);
       setError('Firebase 인증 서비스를 초기화할 수 없습니다.');
       return;
     }
 
+    // Firebase 연결 상태 확인 (Auth 초기화만 확인)
+    const checkConnection = async () => {
+      try {
+        const isConnected = await checkFirebaseConnection();
+        if (!isConnected) {
+          logger.error('Firebase connection failed');
+          // 연결 실패 시에도 계속 진행 (오프라인 지원)
+          logger.warn('Continuing with offline support');
+        } else {
+          logger.info('Firebase connection successful');
+        }
+      } catch (error) {
+        logger.error('Firebase connection check failed:', error);
+        // 연결 확인 실패 시에도 계속 진행
+        logger.warn('Continuing despite connection check failure');
+      }
+    };
+
+    checkConnection();
     setAuthInitialized(true);
     let profileUnsubscribe: (() => void) | null = null;
     let isSubscribed = true;
@@ -145,11 +210,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authUnsubscribe = onAuthStateChanged(
           auth,
           async (user: ExtendedUser | null) => {
-            if (import.meta.env.DEV) {
-              console.log(
-                'Auth state changed:',
-                user ? 'User logged in' : 'User logged out'
-              );
+            try {
+              const viteEnv = (globalThis as any)?.import?.meta?.env;
+              if (viteEnv?.DEV) {
+                logger.debug(
+                  'Auth state changed:',
+                  user ? 'User logged in' : 'User logged out'
+                );
+              }
+            } catch {
+              /* noop */
             }
 
             if (!isSubscribed) return;
@@ -163,16 +233,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (!isSubscribed) return;
 
-                // Initialize FCM for notifications
-                try {
-                  const success = await fcmService.initialize(user.uid);
-                  if (success) {
-                    if (import.meta.env.DEV) {
-                      console.log('FCM initialized for user:', user.uid);
+                // Initialize FCM for notifications (only if VAPID key is configured)
+                if (import.meta.env.VITE_FCM_VAPID_KEY) {
+                  try {
+                    await initializeFCM();
+                    try {
+                      const viteEnv = (globalThis as any)?.import?.meta?.env;
+                      if (viteEnv?.DEV) {
+                        logger.debug('FCM initialized for user:', user.uid);
+                      }
+                    } catch {
+                      /* noop */
                     }
+                  } catch (error) {
+                    logger.error('Failed to initialize FCM:', error);
                   }
-                } catch (error) {
-                  console.error('Failed to initialize FCM:', error);
+                } else {
+                  logger.warn('FCM not initialized: VAPID key not configured');
                 }
 
                 if (!isSubscribed) return;
@@ -181,13 +258,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                   const profile = await userService.getUserProfile(user.uid);
                   if (isSubscribed) {
-                    if (import.meta.env.DEV) {
-                      console.log('Profile loaded:', profile);
+                    try {
+                      const viteEnv = (globalThis as any)?.import?.meta?.env;
+                      if (viteEnv?.DEV) {
+                        logger.debug('Profile loaded:', profile);
+                      }
+                    } catch {
+                      /* noop */
                     }
                     setUserProfile(profile);
                   }
                 } catch (profileError) {
-                  console.error('Profile loading error:', profileError);
+                  logger.error('Profile loading error:', profileError);
                   if (isSubscribed) {
                     setUserProfile(null);
                   }
@@ -197,31 +279,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                   profileUnsubscribe = userService.subscribeToUserProfile(
                     user.uid,
-                    (profile) => {
+                    profile => {
                       if (isSubscribed) {
-                        if (import.meta.env.DEV) {
-                          console.log('Profile updated via subscription:', profile);
+                        try {
+                          const viteEnv = (globalThis as any)?.import?.meta
+                            ?.env;
+                          if (viteEnv?.DEV) {
+                            logger.debug(
+                              'Profile updated via subscription:',
+                              profile
+                            );
+                          }
+                        } catch {
+                          /* noop */
                         }
                         setUserProfile(profile);
                       }
                     },
-                    (error) => {
-                      console.error('Profile subscription error:', error);
+                    error => {
+                      logger.error('Profile subscription error:', error);
                     }
                   );
                 } catch (subscriptionError) {
-                  console.error('Failed to subscribe to profile:', subscriptionError);
+                  logger.error(
+                    'Failed to subscribe to profile:',
+                    subscriptionError
+                  );
                 }
               } catch (error) {
-                console.error('Error in auth state change:', error);
+                logger.error('Error in auth state change:', error);
               }
             } else {
               setUserProfile(null);
+              // Cleanup FCM on logout
+              try {
+                await cleanupFCM();
+              } catch (error) {
+                logger.warn('Error cleaning up FCM on logout:', error);
+              }
               if (profileUnsubscribe) {
                 try {
                   profileUnsubscribe();
                 } catch (error) {
-                  console.warn(
+                  logger.warn(
                     'Error unsubscribing from profile on logout:',
                     error
                   );
@@ -236,7 +336,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         );
       } catch (error) {
-        console.error('Error setting up auth listener:', error);
+        logger.error('Error setting up auth listener:', error);
         if (isSubscribed) {
           setLoading(false);
         }
@@ -252,7 +352,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           authUnsubscribe();
         } catch (error) {
-          console.warn('Error unsubscribing from auth:', error);
+          logger.warn('Error unsubscribing from auth:', error);
         }
       }
 
@@ -260,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           profileUnsubscribe();
         } catch (error) {
-          console.warn('Error unsubscribing from profile:', error);
+          logger.warn('Error unsubscribing from profile:', error);
         }
       }
     };
@@ -394,7 +494,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 프로필 업데이트 후 사용자 프로필 새로고침
       await refreshUserProfile();
     } catch (error) {
-      console.error('Failed to update user profile:', error);
+      logger.error('Failed to update user profile:', error);
       throw error;
     }
   };
@@ -407,7 +507,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile = await userService.getUserProfile(user.uid);
       setUserProfile(profile);
     } catch (error) {
-      console.error('Failed to refresh user profile:', error);
+      logger.error('Failed to refresh user profile:', error);
     }
   };
 

@@ -10,10 +10,10 @@ interface ProtectedRouteProps {
   redirectTo?: string;
 }
 
-export function ProtectedRoute({ 
-  children, 
-  requireAuth = true, 
-  redirectTo = '/login' 
+export function ProtectedRoute({
+  children,
+  requireAuth = true,
+  redirectTo = '/login',
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -24,11 +24,7 @@ export function ProtectedRoute({
       <div className="min-h-screen">
         <WaveBackground />
         <div className="relative z-10 flex items-center justify-center min-h-screen">
-          <LoadingSpinner 
-            size="lg" 
-            variant="wave" 
-            text="인증 확인 중..." 
-          />
+          <LoadingSpinner size="lg" variant="wave" text="인증 확인 중..." />
         </div>
       </div>
     );
@@ -48,17 +44,6 @@ export function ProtectedRoute({
 }
 
 // HOC for protecting routes
-export function withProtectedRoute<P extends object>(
-  Component: React.ComponentType<P>,
-  options?: Omit<ProtectedRouteProps, 'children'>
-) {
-  return function ProtectedComponent(props: P) {
-    return (
-      <ProtectedRoute {...options}>
-        <Component {...props} />
-      </ProtectedRoute>
-    );
-  };
-}
+// HOC moved to './withProtectedRoute' to satisfy react-refresh rule
 
 export default ProtectedRoute;

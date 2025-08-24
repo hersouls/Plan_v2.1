@@ -1,38 +1,37 @@
 import React from 'react';
 import { GlassCard } from '../../ui/GlassCard';
 import { Typography } from '../../ui/typography';
-import { ProfileSection } from '../ProfileSection';
-import { DataSection, NotificationSection, PrivacySection } from '../sections';
-import type { SettingsSectionProps } from '../types';
+import { useSettingsContext } from '../contexts/SettingsContext';
+import {
+  DataSection,
+  NotificationSection,
+  PrivacySection,
+  ProfileSection,
+} from '../sections';
+import type { SettingsState } from '../types';
 
-interface SettingsContentProps extends Omit<SettingsSectionProps, 'isActive'> {
+interface SettingsContentProps {
   activeTab: string;
-  onSave?: () => Promise<void>;
+  settings: SettingsState;
+  saving?: boolean;
 }
 
 export const SettingsContent: React.FC<SettingsContentProps> = ({
   activeTab,
   settings,
-  onUpdate,
-  onSave,
   saving,
 }) => {
+  const { updateSettings } = useSettingsContext();
+
   return (
     <div className="space-y-6 lg:space-y-8">
       {activeTab === 'profile' && (
-        <GlassCard
-          variant="medium"
-          className="p-6 lg:p-8 xl:p-10 transition-all duration-300 hover:shadow-xl"
-          hover
-        >
-          <Typography.H3 className="text-white mb-6 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
-              <div className="w-4 h-4 bg-white rounded-full" />
-            </div>
-            프로필 설정
-          </Typography.H3>
-          <ProfileSection />
-        </GlassCard>
+        <ProfileSection
+          isActive={true}
+          settings={settings}
+          onUpdate={updateSettings}
+          saving={saving}
+        />
       )}
 
       {activeTab === 'notifications' && (
@@ -50,7 +49,7 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
           <NotificationSection
             isActive={true}
             settings={settings}
-            onUpdate={onUpdate}
+            onUpdate={updateSettings}
             saving={saving}
           />
         </GlassCard>
@@ -71,7 +70,7 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
           <PrivacySection
             isActive={true}
             settings={settings}
-            onUpdate={onUpdate}
+            onUpdate={updateSettings}
             saving={saving}
           />
         </GlassCard>
@@ -92,7 +91,7 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
           <DataSection
             isActive={true}
             settings={settings}
-            onUpdate={onUpdate}
+            onUpdate={updateSettings}
             saving={saving}
           />
         </GlassCard>

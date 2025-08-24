@@ -82,7 +82,7 @@ VITE_ENABLE_ANALYTICS=false
 # 선택: Claude AI 연동
 VITE_ENABLE_CLAUDE_AI=false
 VITE_CLAUDE_API_KEY=
-VITE_CLAUDE_MODEL=claude-3-5-sonnet-20241022
+VITE_CLAUDE_MODEL=claude-sonnet-4-20250514
 ```
 
 주의: Firebase 설정이 비어있거나 플레이스홀더일 경우 앱이 실행 중 에러를 발생시킬 수 있습니다. 올바른 값을 반드시 입력하세요.

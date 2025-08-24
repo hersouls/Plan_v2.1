@@ -1,27 +1,25 @@
-import { Save, Settings as SettingsIcon } from 'lucide-react';
-import React, { useState } from 'react';
+import logger from '@/lib/logger';
+import { Save } from 'lucide-react';
+import React from 'react';
 import { InlineLoading, LoadingSpinner } from '../common/LoadingSpinner';
-import { WaveBackground } from '../layout/WaveBackground';
 import { GlassCard } from '../ui/GlassCard';
 import { WaveButton } from '../ui/WaveButton';
 import { Typography } from '../ui/typography';
 import { SettingsContent, SettingsNavigation } from './components';
-import { useSettings } from './hooks/useSettings';
+import { useSettingsContext } from './contexts/SettingsContext';
+import { useSettingsTab } from './hooks/useSettingsTab';
 import type { SettingsContainerProps } from './types';
 
 export const SettingsContainer: React.FC<SettingsContainerProps> = ({
   mode = 'page',
-  initialTab = 'profile',
 }) => {
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const { settings, updateSettings, saveSettings, loading, saving, error } =
-    useSettings();
+  const { activeTab, setActiveTab } = useSettingsTab();
+  const { settings, saveSettings, loading, saving, error } = useSettingsContext();
 
   // 로딩 중일 때
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <LoadingSpinner
             size="lg"
@@ -36,8 +34,7 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({
   // 에러 처리
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <GlassCard variant="light" className="p-8 max-w-md">
             <div className="text-center">
@@ -58,9 +55,7 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({
   // 페이지 모드 렌더링
   if (mode === 'page') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-        <WaveBackground />
-
+      <div className="min-h-screen">
         <div
           className="relative z-10 max-w-6xl xl:max-w-7xl 2xl:max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 sm:py-8 lg:py-12 xl:py-16 fixed-header-spacing"
           style={{ paddingTop: '120px' }}
@@ -80,13 +75,8 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({
               <div className="flex gap-2 sm:gap-3 flex-shrink-0">
                 <WaveButton
                   onClick={() => {
-                    console.log(
-                      'SettingsContainer - Global save button clicked'
-                    );
-                    console.log(
-                      'SettingsContainer - Current settings:',
-                      settings
-                    );
+                    logger.info('settings', 'Global save button clicked');
+                    logger.debug('settings', 'Current settings', settings);
                     saveSettings();
                   }}
                   disabled={saving}
@@ -124,8 +114,6 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({
             <SettingsContent
               activeTab={activeTab}
               settings={settings}
-              onUpdate={updateSettings}
-              onSave={saveSettings}
               saving={saving}
             />
           </div>
@@ -145,8 +133,8 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({
           </h2>
           <WaveButton
             onClick={() => {
-              console.log('SettingsContainer - Modal save button clicked');
-              console.log('SettingsContainer - Current settings:', settings);
+              logger.info('settings', 'Modal save button clicked');
+              logger.debug('settings', 'Current settings', settings);
               saveSettings();
             }}
             disabled={saving}
@@ -177,8 +165,6 @@ export const SettingsContainer: React.FC<SettingsContainerProps> = ({
       <SettingsContent
         activeTab={activeTab}
         settings={settings}
-        onUpdate={updateSettings}
-        onSave={saveSettings}
         saving={saving}
       />
     </div>

@@ -1,15 +1,9 @@
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
 import StorageService from '../../../lib/storage';
+import logger from '../../../lib/logger';
 import type {
   DataSettings,
   NotificationPreferences,
@@ -20,7 +14,7 @@ import type {
 } from '../types';
 
 // 기본 설정값
-const getDefaultSettings = (user: any): SettingsState => {
+const getDefaultSettings = (user: { displayName?: string; email?: string; photoURL?: string } | null): SettingsState => {
   try {
     return {
       profile: {
@@ -76,8 +70,7 @@ const getDefaultSettings = (user: any): SettingsState => {
       },
     };
   } catch (error) {
-    console.error('Error creating default settings:', error);
-    // 기본값 반환
+    logger.error('SettingsContext', 'create default settings failed', error);
     return {
       profile: {
         displayName: '',
@@ -152,7 +145,6 @@ function settingsReducer(
         notifications: {
           ...state.notifications,
           ...action.payload,
-          // Deep merge for nested objects
           channels: {
             ...state.notifications.channels,
             ...action.payload.channels,
@@ -164,7 +156,7 @@ function settingsReducer(
       };
 
     case 'UPDATE_APPEARANCE':
-      console.log('settingsReducer - UPDATE_APPEARANCE:', action.payload);
+      logger.debug('SettingsContext', 'UPDATE_APPEARANCE', action.payload);
       return {
         ...state,
         appearance: { ...state.appearance, ...action.payload },
@@ -186,14 +178,14 @@ function settingsReducer(
       return action.payload;
 
     case 'RESET_TO_DEFAULTS':
-      return getDefaultSettings(null); // Will be updated with current user
+      return getDefaultSettings(null);
 
     default:
       return state;
   }
 }
 
-export interface UseSettingsReturn {
+interface SettingsContextType {
   settings: SettingsState;
   updateSettings: (action: SettingsAction) => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
@@ -214,8 +206,21 @@ export interface UseSettingsReturn {
   error: string | null;
 }
 
-// Settings Hook
-export function useSettings(): UseSettingsReturn {
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+
+export const useSettingsContext = () => {
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error('useSettingsContext must be used within a SettingsProvider');
+  }
+  return context;
+};
+
+interface SettingsProviderProps {
+  children: React.ReactNode;
+}
+
+export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
   const [settings, dispatch] = useReducer(
     settingsReducer,
     getDefaultSettings(null)
@@ -224,32 +229,26 @@ export function useSettings(): UseSettingsReturn {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSyncRef = useRef<number>(0);
   const isInitializedRef = useRef(false);
 
-  // AuthContext 접근을 안전하게 처리
   const authContext = useAuth();
-
-  // user 객체를 메모이제이션하여 불필요한 리렌더링 방지
   const currentUser = useMemo(() => {
     try {
       return authContext.user;
     } catch (error) {
-      console.error('Error accessing auth context:', error);
+      logger.error('SettingsContext', 'Error accessing auth context', error);
       return null;
     }
-  }, [authContext.user?.uid]); // uid만 의존
+  }, [authContext.user?.uid]);
 
-  // LocalStorage 키 (상수로 정의)
   const STORAGE_KEY = 'moonwave-settings' as const;
 
-  // 설정 로드 함수 (의존성 없이 정의)
   const loadSettingsInternal = useCallback(async () => {
     const userId = currentUser?.uid;
 
     if (!userId) {
-      // 사용자가 없으면 기본 설정만 로드
       const defaultSettings = getDefaultSettings(null);
       dispatch({ type: 'LOAD_SETTINGS', payload: defaultSettings });
       return;
@@ -259,12 +258,10 @@ export function useSettings(): UseSettingsReturn {
     setError(null);
 
     try {
-      // 마지막 동기화로부터 1시간이 지났는지 확인
       const now = Date.now();
-      const oneHour = 60 * 60 * 1000; // 1시간 (밀리초)
+      const oneHour = 60 * 60 * 1000;
 
       if (now - lastSyncRef.current < oneHour) {
-        // 1시간이 지나지 않았으면 localStorage에서만 로드
         const savedSettings = localStorage.getItem(STORAGE_KEY);
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
@@ -277,15 +274,12 @@ export function useSettings(): UseSettingsReturn {
         return;
       }
 
-      // Firebase에서 사용자 프로필 로드
       const userDocRef = doc(db, 'users', userId);
       const docSnapshot = await getDoc(userDocRef);
 
       try {
         if (docSnapshot.exists()) {
           const userProfile = docSnapshot.data();
-
-          // localStorage에서 설정 로드
           const savedSettings = localStorage.getItem(STORAGE_KEY);
           let settings;
 
@@ -314,7 +308,6 @@ export function useSettings(): UseSettingsReturn {
                   authContext.user?.photoURL ||
                   parsed.profile.avatar,
               },
-              // Firestore에서 저장된 설정 데이터 복원
               notifications:
                 userProfile.settings?.notifications || parsed.notifications,
               appearance: userProfile.settings?.appearance || parsed.appearance,
@@ -322,7 +315,6 @@ export function useSettings(): UseSettingsReturn {
               data: userProfile.settings?.data || parsed.data,
             };
           } else {
-            // 기본값 사용하되 Firebase 데이터 반영
             settings = {
               ...getDefaultSettings(currentUser),
               profile: {
@@ -350,7 +342,6 @@ export function useSettings(): UseSettingsReturn {
                   authContext.user?.photoURL ||
                   getDefaultSettings(currentUser).profile.avatar,
               },
-              // Firestore에서 저장된 설정 데이터 복원
               notifications:
                 userProfile.settings?.notifications ||
                 getDefaultSettings(currentUser).notifications,
@@ -367,52 +358,44 @@ export function useSettings(): UseSettingsReturn {
           }
 
           dispatch({ type: 'LOAD_SETTINGS', payload: settings });
-          lastSyncRef.current = now; // 동기화 시간 업데이트
+          lastSyncRef.current = now;
         } else {
-          // 사용자 문서가 없으면 기본 설정 사용
           const defaultSettings = getDefaultSettings(currentUser);
-
           dispatch({ type: 'LOAD_SETTINGS', payload: defaultSettings });
-          lastSyncRef.current = now; // 동기화 시간 업데이트
+          lastSyncRef.current = now;
         }
       } catch (error) {
-        console.error('Error processing user profile:', error);
+        logger.error('SettingsContext', 'process user profile failed', error);
         setError('사용자 프로필을 처리하는 중 오류가 발생했습니다.');
       }
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      logger.error('SettingsContext', 'load user profile failed', error);
       setError('사용자 프로필을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   }, [currentUser?.uid, authContext.user]);
 
-  // 외부에서 호출할 수 있는 loadSettings 함수
   const loadSettings = useCallback(async () => {
     await loadSettingsInternal();
   }, [loadSettingsInternal]);
 
-  // 설정 저장
   const saveSettings = useCallback(async () => {
     const userId = currentUser?.uid;
-    console.log('useSettings - saveSettings called');
-    console.log('useSettings - current settings:', settings);
+    if (import.meta.env.DEV) logger.debug('SettingsContext', 'save called');
     setSaving(true);
     setError(null);
 
     try {
-      // 현재 settings 상태를 안전하게 참조
       const currentSettings = settings;
-      console.log('useSettings - saving current settings:', currentSettings);
+      if (import.meta.env.DEV)
+        logger.debug('SettingsContext', 'saving settings', currentSettings);
 
-      // localStorage에 저장
       localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSettings));
 
-      // Firebase에 사용자 프로필 업데이트
       if (userId) {
         const { userService } = await import('../../../lib/firestore');
 
-        // undefined 값을 필터링하여 Firestore에 전달할 데이터 준비
         const userData = {
           displayName: currentSettings.profile.displayName,
           email: currentSettings.profile.email,
@@ -420,7 +403,6 @@ export function useSettings(): UseSettingsReturn {
           location: currentSettings.profile.location,
           bio: currentSettings.profile.bio,
           photoURL: currentSettings.profile.avatar,
-          // 설정 데이터도 함께 저장
           settings: {
             notifications: currentSettings.notifications,
             appearance: currentSettings.appearance,
@@ -430,7 +412,6 @@ export function useSettings(): UseSettingsReturn {
           updatedAt: Timestamp.now(),
         };
 
-        // undefined와 빈 문자열 값 제거
         const filteredData = Object.fromEntries(
           Object.entries(userData).filter(
             ([_, value]) => value !== undefined && value !== ''
@@ -440,19 +421,16 @@ export function useSettings(): UseSettingsReturn {
         await userService.createOrUpdateUserProfile(userId, filteredData);
       }
 
-      if (import.meta.env.DEV) {
-        console.log('Settings saved successfully:', settings);
-      }
+      if (import.meta.env.DEV) logger.debug('SettingsContext', 'saved', settings);
     } catch (err) {
-      console.error('Failed to save settings:', err);
+      logger.error('SettingsContext', 'save failed', err);
       setError('설정을 저장하는데 실패했습니다.');
       throw err;
     } finally {
       setSaving(false);
     }
-  }, [currentUser?.uid, settings]); // uid와 settings에만 의존
+  }, [currentUser?.uid, settings]);
 
-  // 아바타 업로드
   const uploadAvatar = useCallback(
     async (
       file: File,
@@ -467,28 +445,24 @@ export function useSettings(): UseSettingsReturn {
       setError(null);
 
       try {
-        // 이전 아바타 삭제 (선택적)
         if (
           settings.profile.avatar &&
           settings.profile.avatar.includes('firebase')
         ) {
           try {
-            // Extract file path from URL to delete old avatar
             const url = new URL(settings.profile.avatar);
             const pathMatch = url.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)\?/);
             if (pathMatch) {
               const decodedPath = decodeURIComponent(pathMatch[1]);
               await StorageService.deleteFile({
                 storageUrl: decodedPath,
-              } as any);
+              });
             }
           } catch (deleteError) {
-            console.warn('Failed to delete old avatar:', deleteError);
-            // 이전 아바타 삭제 실패는 무시하고 계속 진행
+            logger.warn('SettingsContext', 'delete old avatar failed', deleteError);
           }
         }
 
-        // 새 아바타 업로드
         const fileAttachment = await StorageService.uploadFile(
           file,
           `avatars/${userId}`,
@@ -508,13 +482,11 @@ export function useSettings(): UseSettingsReturn {
           downloadURL: fileAttachment.downloadUrl,
         };
 
-        // 프로필 업데이트
         dispatch({
           type: 'UPDATE_PROFILE',
           payload: { avatar: result.downloadURL },
         });
 
-        // 즉시 저장
         const updatedSettings = {
           ...settings,
           profile: {
@@ -535,7 +507,7 @@ export function useSettings(): UseSettingsReturn {
 
         return result.downloadURL;
       } catch (error) {
-        console.error('Failed to upload avatar:', error);
+        logger.error('SettingsContext', 'upload avatar failed', error);
         const errorMessage =
           error instanceof Error
             ? error.message
@@ -549,7 +521,6 @@ export function useSettings(): UseSettingsReturn {
     [currentUser?.uid, settings]
   );
 
-  // 아바타 삭제
   const deleteAvatar = useCallback(async (): Promise<void> => {
     const userId = currentUser?.uid;
     if (!userId) {
@@ -560,7 +531,6 @@ export function useSettings(): UseSettingsReturn {
     setError(null);
 
     try {
-      // Firebase Storage에서 아바타 삭제
       if (
         settings.profile.avatar &&
         settings.profile.avatar.includes('firebase')
@@ -570,20 +540,22 @@ export function useSettings(): UseSettingsReturn {
           const pathMatch = url.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)\?/);
           if (pathMatch) {
             const decodedPath = decodeURIComponent(pathMatch[1]);
-            await StorageService.deleteFile({ storageUrl: decodedPath } as any);
+            await StorageService.deleteFile({ storageUrl: decodedPath });
           }
         } catch (deleteError) {
-          console.warn('Failed to delete avatar from storage:', deleteError);
+          logger.warn(
+            'SettingsContext',
+            'Failed to delete avatar from storage',
+            deleteError
+          );
         }
       }
 
-      // 프로필에서 아바타 제거
       dispatch({
         type: 'UPDATE_PROFILE',
         payload: { avatar: undefined },
       });
 
-      // 즉시 저장
       const updatedSettings = {
         ...settings,
         profile: {
@@ -602,7 +574,7 @@ export function useSettings(): UseSettingsReturn {
         });
       }
     } catch (error) {
-      console.error('Failed to delete avatar:', error);
+      logger.error('SettingsContext', 'delete avatar failed', error);
       const errorMessage =
         error instanceof Error ? error.message : '아바타 삭제에 실패했습니다.';
       setError(errorMessage);
@@ -612,34 +584,29 @@ export function useSettings(): UseSettingsReturn {
     }
   }, [currentUser?.uid, settings]);
 
-  // user 상태가 변경될 때마다 설정 로드 (한 번만 실행)
   useEffect(() => {
     if (currentUser?.uid && !isInitializedRef.current) {
       isInitializedRef.current = true;
       loadSettingsInternal();
     }
-  }, [currentUser?.uid]); // loadSettingsInternal을 의존성에서 제거
+  }, [currentUser?.uid]);
 
-  // 1시간마다 자동 동기화 설정
   useEffect(() => {
     if (currentUser?.uid) {
-      // 1시간마다 자동 동기화
       const syncInterval = setInterval(() => {
         loadSettingsInternal();
-      }, 60 * 60 * 1000); // 1시간 (밀리초)
+      }, 60 * 60 * 1000);
 
       syncIntervalRef.current = syncInterval;
 
-      // 컴포넌트 언마운트 시 인터벌 정리
       return () => {
         if (syncIntervalRef.current) {
           clearInterval(syncIntervalRef.current);
         }
       };
     }
-  }, [currentUser?.uid]); // loadSettingsInternal을 의존성에서 제거
+  }, [currentUser?.uid]);
 
-  // 편의 함수들
   const updateProfile = useCallback((updates: Partial<UserProfile>) => {
     dispatch({ type: 'UPDATE_PROFILE', payload: updates });
   }, []);
@@ -664,11 +631,12 @@ export function useSettings(): UseSettingsReturn {
   }, []);
 
   const updateSettings = useCallback((action: SettingsAction) => {
-    console.log('useSettings - updateSettings called with action:', action);
+    if (import.meta.env.DEV)
+      logger.debug('SettingsContext', 'updateSettings', action);
     dispatch(action);
   }, []);
 
-  return {
+  const contextValue: SettingsContextType = {
     settings,
     updateSettings,
     updateProfile,
@@ -685,4 +653,10 @@ export function useSettings(): UseSettingsReturn {
     uploadingAvatar,
     error,
   };
-}
+
+  return (
+    <SettingsContext.Provider value={contextValue}>
+      {children}
+    </SettingsContext.Provider>
+  );
+};

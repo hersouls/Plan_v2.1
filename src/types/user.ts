@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
-import { TypographyAccessibility, FontSize, LineHeight, LetterSpacing } from './typography';
+import { TypographyAccessibility } from './typography';
 
 export type UserStatus = 'online' | 'offline' | 'away' | 'busy';
 export type UserTheme = 'light' | 'dark' | 'system';
@@ -7,25 +7,25 @@ export type NotificationPreference = 'all' | 'important' | 'none';
 export type MemberRole = 'owner' | 'admin' | 'vice_owner' | 'member' | 'viewer';
 
 export interface User {
-  id: string;                    // Auth UID
+  id: string; // Auth UID
   email: string;
   displayName: string;
-  photoURL?: string;            // Standardized field name
+  photoURL?: string; // Standardized field name
   bio?: string;
   phoneNumber?: string;
-  location?: string;            // 사용자 위치 정보 추가
-  avatarStorageUrl?: string;    // Firebase Storage URL 추가
+  location?: string; // 사용자 위치 정보 추가
+  avatarStorageUrl?: string; // Firebase Storage URL 추가
   status: UserStatus;
   lastSeen: Timestamp;
   isAnonymous: boolean;
   emailVerified: boolean;
   provider: 'google' | 'github' | 'email' | 'anonymous';
-  
+
   // App-specific fields
-  groupIds: string[];           // Groups user belongs to
+  groupIds: string[]; // Groups user belongs to
   loginCount: number;
   lastLoginAt: Timestamp;
-  
+
   preferences: {
     theme: 'light' | 'dark' | 'system';
     language: string;
@@ -37,7 +37,7 @@ export interface User {
     defaultTaskSettings: DefaultTaskSettings;
     privacy: PrivacySettings;
   };
-  
+
   stats: {
     totalTasksCreated: number;
     totalTasksCompleted: number;
@@ -46,12 +46,12 @@ export interface User {
     longestStreak: number;
     completionRate: number;
   };
-  
+
   badges: string[];
   achievements: string[];
   points: number;
   level: number;
-  
+
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -178,7 +178,13 @@ export interface UpdateUserInput {
 export interface UserNotification {
   id: string;
   userId: string;
-  type: 'task_assigned' | 'task_due' | 'task_completed' | 'comment_added' | 'mention' | 'group_invite';
+  type:
+    | 'task_assigned'
+    | 'task_due'
+    | 'task_completed'
+    | 'comment_added'
+    | 'mention'
+    | 'group_invite';
   title: string;
   body: string;
   data?: Record<string, any>;

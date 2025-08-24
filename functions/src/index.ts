@@ -1,10 +1,13 @@
 import * as admin from 'firebase-admin';
 import {
   onDocumentCreated,
+  onDocumentDeleted,
   onDocumentUpdated,
 } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 // import { onObjectFinalized, onObjectDeleted } from 'firebase-functions/v2/storage';
+
+// Import scheduling functions
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -36,8 +39,10 @@ export const onTaskCreated = onDocumentCreated(
         );
       }
 
-      // Update group statistics
-      await updateGroupStats(taskData.groupId);
+      // Update group statistics (skip personal tasks)
+      if (taskData.groupId && taskData.groupId !== 'personal') {
+        await updateGroupStats(taskData.groupId);
+      }
 
       // Create activity log
       await createActivityLog({
@@ -74,8 +79,10 @@ export const onTaskUpdated = onDocumentUpdated(
         await sendTaskReassignmentNotification(after.assigneeId, after, taskId);
       }
 
-      // Update group statistics
-      await updateGroupStats(after.groupId);
+      // Update group statistics (skip personal tasks)
+      if (after.groupId && after.groupId !== 'personal') {
+        await updateGroupStats(after.groupId);
+      }
     } catch (error) {
       console.error('Error processing task update:', error);
     }
@@ -83,7 +90,7 @@ export const onTaskUpdated = onDocumentUpdated(
 );
 
 export const onCommentCreated = onDocumentCreated(
-  'comments',
+  'comments/{commentId}',
   async event => {
     const commentData = event.data?.data();
     const commentId = event.params.commentId;
@@ -92,7 +99,7 @@ export const onCommentCreated = onDocumentCreated(
 
     try {
       const taskId = commentData.taskId;
-      
+
       // Get task data
       const taskDoc = await db.doc(`tasks/${taskId}`).get();
       if (!taskDoc.exists) return;
@@ -125,15 +132,15 @@ export const onCommentCreated = onDocumentCreated(
 );
 
 export const onCommentDeleted = onDocumentDeleted(
-  'comments',
+  'comments/{commentId}',
   async event => {
     const commentData = event.data?.data();
-    
+
     if (!commentData) return;
 
     try {
       const taskId = commentData.taskId;
-      
+
       // Update task comment count
       const commentsQuery = await db
         .collection('comments')
@@ -162,7 +169,7 @@ export const sendDailyReminders = onSchedule('0 9 * * *', async event => {
     const tasksQuery = await db
       .collection('tasks')
       .where('status', 'in', ['pending', 'in_progress'])
-      .where('dueDate', '<=', today.toISOString())
+      .where('dueDate', '<=', admin.firestore.Timestamp.fromDate(today))
       .get();
 
     const reminderPromises: Promise<any>[] = [];
@@ -234,6 +241,17 @@ async function sendTaskAssignmentNotification(
     };
 
     const response = await messaging.sendEachForMulticast(message);
+    // Persist a corresponding notification document for the UI
+    await db.collection('notifications').add({
+      userId,
+      title: '새 할일이 할당되었습니다',
+      message: `${assignerName}님이 "${taskData.title}" 할일을 할당했습니다.`,
+      type: 'task',
+      status: 'unread',
+      priority: 'medium',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      data: { taskId, actionUrl: `/tasks/${taskId}` },
+    });
     console.log(
       'Task assignment notification sent:',
       response.successCount,
@@ -288,6 +306,16 @@ async function sendTaskReminderNotification(
     };
 
     const response = await messaging.sendEachForMulticast(message);
+    await db.collection('notifications').add({
+      userId,
+      title: '할일 알림',
+      message: `"${taskData.title}" - ${dueSoon}`,
+      type: 'reminder',
+      status: 'unread',
+      priority: 'high',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      data: { taskId, actionUrl: `/tasks/${taskId}` },
+    });
     console.log(
       'Task reminder sent:',
       response.successCount,
@@ -358,6 +386,16 @@ async function sendTaskCompletionNotification(
     };
 
     const response = await messaging.sendEachForMulticast(message);
+    await db.collection('notifications').add({
+      userId,
+      title: '할일이 완료되었습니다',
+      message: `${completerName}님이 "${taskData.title}" 할일을 완료했습니다.`,
+      type: 'task',
+      status: 'unread',
+      priority: 'low',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      data: { taskId, actionUrl: `/tasks/${taskId}` },
+    });
     console.log(
       'Task completion notification sent:',
       response.successCount,
@@ -386,12 +424,12 @@ async function sendCommentNotification(
     // 멘션된 사용자 확인
     const mentionedUsers = commentData.mentions || [];
     const isMentioned = mentionedUsers.includes(userId);
-    
+
     // 멘션된 경우 더 강조된 알림
-    const notificationTitle = isMentioned 
-      ? '멘션되었습니다' 
+    const notificationTitle = isMentioned
+      ? '멘션되었습니다'
       : '새 댓글이 있습니다';
-    
+
     const notificationBody = isMentioned
       ? `${commentData.userName}님이 "${taskData.title}" 할일에서 당신을 멘션했습니다.`
       : `${commentData.userName}님이 "${taskData.title}" 할일에 댓글을 남겼습니다.`;
@@ -431,6 +469,16 @@ async function sendCommentNotification(
     };
 
     const response = await messaging.sendEachForMulticast(message);
+    await db.collection('notifications').add({
+      userId,
+      title: notificationTitle,
+      message: notificationBody,
+      type: 'task',
+      status: 'unread',
+      priority: isMentioned ? 'high' : 'medium',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      data: { taskId: taskData.id, actionUrl: `/tasks/${taskData.id}` },
+    });
     console.log(
       `${isMentioned ? 'Mention' : 'Comment'} notification sent:`,
       response.successCount,
@@ -562,6 +610,17 @@ async function sendWeeklySummaryToGroup(groupId: string, groupData: any) {
       };
 
       await messaging.sendEachForMulticast(message);
+      // Persist weekly summary notifications per member
+      await db.collection('notifications').add({
+        userId: memberId,
+        title: '주간 요약',
+        message: `이번 주에 ${completedCount}개의 할일을 완료했습니다! 👏`,
+        type: 'system',
+        status: 'unread',
+        priority: 'low',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        data: { actionUrl: '/statistics' },
+      });
     }
   } catch (error) {
     console.error('Error sending weekly summary:', error);
@@ -641,3 +700,11 @@ async function sendTaskReassignmentNotification(
 //     console.error('Error processing file deletion:', error);
 //   }
 // });
+
+// Export scheduling functions
+export {
+  generateRecurringTasks,
+  processScheduledReminders,
+  rescheduleTaskReminders,
+  scheduleTaskReminders,
+};

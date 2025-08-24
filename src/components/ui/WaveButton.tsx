@@ -1,3 +1,4 @@
+import type React from 'react';
 import { forwardRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { WaveButtonProps } from '../../types/ui';
@@ -20,6 +21,18 @@ export const WaveButton = forwardRef<HTMLButtonElement, WaveButtonProps>(
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
       if (disabled) return;
+      // submit 버튼은 기본 폼 제출 동작을 유지
+      const isSubmit =
+        (
+          props as {
+            type?: React.ButtonHTMLAttributes<HTMLButtonElement>['type'];
+          }
+        )?.type === 'submit';
+      if (!isSubmit) {
+        // 버튼 클릭 시 부모 링크/라우터 네비게이션으로 버블링되지 않게 방지
+        event.preventDefault();
+        event.stopPropagation();
+      }
       setIsPressed(true);
       setTimeout(() => setIsPressed(false), 600);
       onClick?.(event);

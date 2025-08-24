@@ -3,6 +3,9 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import {
   ArrowUp,
   Camera,
+  CheckCircle,
+  Circle,
+  Clock,
   Copy,
   Crown,
   Edit,
@@ -13,20 +16,357 @@ import {
   Trash2,
   UserPlus,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { GroupChat } from '../components/family/GroupChat';
 
-import { WaveBackground } from '../components/layout/WaveBackground';
+import { logger } from '@/lib/utils';
 import { GlassCard } from '../components/ui/GlassCard';
 import { WaveButton } from '../components/ui/WaveButton';
+import { Badge } from '../components/ui/badge';
 import { Typography } from '../components/ui/typography';
+import { useToast } from '../components/ui/useToast';
 import { useAuth } from '../contexts/AuthContext';
 import { useGroup, useUserGroups } from '../hooks/useGroup';
 import { useTasks } from '../hooks/useTasks';
+import type { Group, GroupMember, UpdateGroupInput } from '../types/group';
 import { Task } from '../types/task';
 import { toDate } from '../utils/dateHelpers';
+
+// Minimal QR Modals (local implementations)
+interface QRScannerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onScanSuccess: (data: string) => void;
+  onScanError: (error: string) => void;
+}
+
+function QRScannerModal({
+  isOpen,
+  onClose,
+  onScanSuccess,
+}: QRScannerModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    // 포커스 이동
+    const el = dialogRef.current;
+    if (el) {
+      const focusables = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      (focusables[0] || el).focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (e.key === 'Tab' && el) {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !el.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (active === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="presentation"
+    >
+      <GlassCard
+        ref={dialogRef}
+        variant="medium"
+        className="p-6 max-w-md w-full"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="qrscanner-title"
+      >
+        <Typography.H3 id="qrscanner-title" className="text-white mb-4">
+          QR 스캔
+        </Typography.H3>
+        <Typography.Body className="text-white/80 mb-4">
+          카메라 접근 없이 데모 스캔을 제공합니다.
+        </Typography.Body>
+        <div className="flex gap-3">
+          <WaveButton
+            variant="ghost"
+            onClick={onClose}
+            className="flex-1"
+            aria-label="닫기"
+          >
+            닫기
+          </WaveButton>
+          <WaveButton
+            variant="primary"
+            onClick={() => onScanSuccess('demo-invite-code')}
+            className="flex-1"
+            aria-label="데모 스캔 성공"
+          >
+            스캔 성공 (데모)
+          </WaveButton>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+interface QRInviteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  inviteCode: string;
+  groupName: string;
+  inviteUrl: string;
+}
+
+function QRInviteModal({
+  isOpen,
+  onClose,
+  inviteCode,
+  groupName,
+  inviteUrl,
+}: QRInviteModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const el = dialogRef.current;
+    if (el) {
+      const focusables = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      (focusables[0] || el).focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (e.key === 'Tab' && el) {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !el.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (active === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="presentation"
+    >
+      <GlassCard
+        ref={dialogRef}
+        variant="medium"
+        className="p-6 max-w-md w-full"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="qrinvite-title"
+      >
+        <Typography.H3 id="qrinvite-title" className="text-white mb-4">
+          QR 초대
+        </Typography.H3>
+        <div className="space-y-2 mb-4">
+          <Typography.Body className="text-white/80">
+            그룹: {groupName}
+          </Typography.Body>
+          <Typography.Body className="text-white/80">
+            코드: {inviteCode}
+          </Typography.Body>
+          <Typography.Caption className="text-white/60 break-all">
+            URL: {inviteUrl}
+          </Typography.Caption>
+        </div>
+        <WaveButton
+          variant="primary"
+          onClick={onClose}
+          className="w-full"
+          aria-label="닫기"
+        >
+          닫기
+        </WaveButton>
+      </GlassCard>
+    </div>
+  );
+}
+
+// Confirmation Modal Component
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+function ConfirmationModal({
+  isOpen,
+  onClose,
+  title,
+  message,
+  onConfirm,
+  confirmText = '확인',
+  cancelText = '취소',
+}: ConfirmationModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const el = dialogRef.current;
+    if (el) {
+      const focusables = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      (focusables[0] || el).focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (e.key === 'Tab' && el) {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (e.shiftKey) {
+          if (active === first || !el.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (active === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    onConfirm();
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      role="presentation"
+    >
+      <GlassCard
+        ref={dialogRef}
+        variant="medium"
+        className="p-6 max-w-md w-full"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        aria-describedby="confirm-message"
+      >
+        <Typography.H3 id="confirm-title" className="text-white mb-4">
+          {title}
+        </Typography.H3>
+        <Typography.Body id="confirm-message" className="text-white/80 mb-6">
+          {message}
+        </Typography.Body>
+        <div className="flex gap-3">
+          <WaveButton
+            variant="ghost"
+            onClick={onClose}
+            className="flex-1"
+            aria-label="취소"
+          >
+            {cancelText}
+          </WaveButton>
+          <WaveButton
+            variant="primary"
+            onClick={handleConfirm}
+            className="flex-1"
+            aria-label="확인"
+          >
+            {confirmText}
+          </WaveButton>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
 
 // Extended Group Member interface for UI
 interface ExtendedGroupMember {
@@ -36,7 +376,7 @@ interface ExtendedGroupMember {
   email?: string;
   avatar?: string;
   role: 'owner' | 'admin' | 'vice_owner' | 'member' | 'viewer';
-  joinedAt: any;
+  joinedAt: unknown;
 
   // 그룹별 통계 (개선된 구조)
   tasksCreated?: number; // 이 그룹에서 생성한 할일 수
@@ -46,7 +386,9 @@ interface ExtendedGroupMember {
 }
 
 function FamilyManage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
+  const { success: showSuccess, error: showError } = useToast();
   const navigate = useNavigate();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showQRInviteModal, setShowQRInviteModal] = useState(false);
@@ -56,10 +398,24 @@ function FamilyManage() {
   const [showMemberEditModal, setShowMemberEditModal] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showFullscreenChatModal, setShowFullscreenChatModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [confirmationData, setConfirmationData] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+  } | null>(null);
+  type ChatMember = {
+    userId: string;
+    displayName?: string;
+    userName?: string;
+    avatar?: string;
+  };
   const [fullscreenChatData, setFullscreenChatData] = useState<{
     groupId: string;
     groupName: string;
-    members: any[];
+    members: ChatMember[];
   } | null>(null);
   const [selectedMember, setSelectedMember] =
     useState<ExtendedGroupMember | null>(null);
@@ -102,6 +458,19 @@ function FamilyManage() {
   // 즐겨찾기 그룹 관리
   const [favoriteGroups, setFavoriteGroups] = useState<string[]>([]);
 
+  // 승인 대기 목록 상태
+  interface PendingInvitation {
+    id: string;
+    invitedUserId?: string;
+    email?: string;
+    role?: 'member' | 'admin' | 'owner' | string;
+    createdAt?: Date | { toDate?: () => Date } | string;
+    expiresAt?: Date | { toDate?: () => Date } | string;
+  }
+  const [pendingInvitations, setPendingInvitations] = useState<
+    PendingInvitation[]
+  >([]);
+
   // Use real data from Firebase
   const {
     groups,
@@ -120,6 +489,10 @@ function FamilyManage() {
     deleteGroup,
     generateInviteCode,
     joinGroupByCode,
+    transferOwnership,
+    getPendingInvitations,
+    approveInvitation,
+    rejectInvitation,
   } = useGroup({ groupId: selectedGroupId || undefined });
 
   // 할일 목록 가져오기 - 현재 선택된 그룹의 할일만 가져오기
@@ -135,29 +508,42 @@ function FamilyManage() {
       try {
         setFavoriteGroups(JSON.parse(savedFavorites));
       } catch (error) {
-        console.error('Failed to parse favorite groups:', error);
+        logger.warn('FamilyManage', 'parse favorite groups failed', error);
         setFavoriteGroups([]);
       }
     }
   }, []);
 
+  // 승인 대기 목록 로드
+  useEffect(() => {
+    if (selectedGroupId) {
+      loadPendingInvitations();
+    } else {
+      setPendingInvitations([]);
+    }
+    // loadPendingInvitations는 안정적인 로컬 함수로 의존성에서 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId]);
+
   // 전체화면 채팅 모달 이벤트 리스너
   useEffect(() => {
     const handleFullscreenChatOpen = (event: CustomEvent) => {
-      console.log('전체화면 채팅 모달 이벤트 수신:', event.detail);
+      logger.debug('FamilyManage', 'fullscreen chat open event', {
+        hasDetail: !!event.detail,
+      });
       setFullscreenChatData(event.detail);
       setShowFullscreenChatModal(true);
-      console.log('전체화면 채팅 모달 상태 업데이트 완료');
+      logger.debug('FamilyManage', 'fullscreen chat state updated');
     };
 
-    console.log('전체화면 채팅 모달 이벤트 리스너 등록');
+    logger.debug('FamilyManage', 'add fullscreen chat listener');
     window.addEventListener(
       'groupChatFullscreenOpen',
       handleFullscreenChatOpen as EventListener
     );
 
     return () => {
-      console.log('전체화면 채팅 모달 이벤트 리스너 제거');
+      logger.debug('FamilyManage', 'remove fullscreen chat listener');
       window.removeEventListener(
         'groupChatFullscreenOpen',
         handleFullscreenChatOpen as EventListener
@@ -169,7 +555,7 @@ function FamilyManage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && showFullscreenChatModal) {
-        console.log('ESC 키로 모달 닫기');
+        logger.debug('FamilyManage', 'ESC close modal');
         setShowFullscreenChatModal(false);
       }
     };
@@ -181,7 +567,7 @@ function FamilyManage() {
   // 전체화면 채팅 모달 닫기 이벤트 리스너
   useEffect(() => {
     const handleFullscreenChatClose = () => {
-      console.log('전체화면 채팅 모달 닫기 이벤트 수신');
+      logger.debug('FamilyManage', 'fullscreen chat close event');
       setShowFullscreenChatModal(false);
     };
 
@@ -300,24 +686,25 @@ function FamilyManage() {
 
   // 최근 로그인 시간을 포맷하는 함수
   const formatLastLoginTime = (lastLoginTime: Date | null): string => {
-    if (!lastLoginTime) return '로그인 기록 없음';
+    if (!lastLoginTime)
+      return t('common.none', { defaultValue: '로그인 기록 없음' });
 
     const now = new Date();
     const timeDiff = now.getTime() - lastLoginTime.getTime();
 
     // 1분 이내
     if (timeDiff < 60 * 1000) {
-      return '방금 전';
+      return t('common.justNow', { defaultValue: '방금 전' });
     }
     // 1시간 이내
     if (timeDiff < 60 * 60 * 1000) {
       const minutes = Math.floor(timeDiff / (60 * 1000));
-      return `${minutes}분 전`;
+      return t('common.minutesAgo', { defaultValue: '{{m}}분 전', m: minutes });
     }
     // 24시간 이내
     if (timeDiff < 24 * 60 * 60 * 1000) {
       const hours = Math.floor(timeDiff / (60 * 60 * 1000));
-      return `${hours}시간 전`;
+      return t('common.hoursAgo', { defaultValue: '{{h}}시간 전', h: hours });
     }
     // 7일 이내
     if (timeDiff < 7 * 24 * 60 * 60 * 1000) {
@@ -339,7 +726,7 @@ function FamilyManage() {
     userId: string
   ): Promise<{ isOnline: boolean; lastLoginTime: Date | null }> => {
     try {
-      console.log(`🔍 Checking online status for user: ${userId}`);
+      logger.debug('FamilyManage', 'check online status', { userId });
 
       // 방법 1: 현재 로그인한 사용자의 정보 확인 (클라이언트 사이드 안전)
       try {
@@ -348,38 +735,41 @@ function FamilyManage() {
 
         // 현재 사용자와 확인하려는 사용자가 같은 경우에만 정보 접근 가능
         if (currentUser && currentUser.uid === userId) {
-          console.log('📱 Current user metadata:', currentUser.metadata);
+          logger.debug('FamilyManage', 'current user metadata');
 
           if (currentUser.metadata.lastSignInTime) {
             const lastLogin = new Date(currentUser.metadata.lastSignInTime);
             const now = new Date();
             const timeDiff = now.getTime() - lastLogin.getTime();
 
-            console.log('✅ Current user lastSignInTime found:', lastLogin);
-            console.log('⏰ Time difference:', timeDiff / 1000 / 60, 'minutes');
+            logger.debug('FamilyManage', 'current user lastSignInTime found');
 
             return {
               isOnline: timeDiff < 10 * 60 * 1000,
               lastLoginTime: lastLogin,
             };
           } else {
-            console.log('❌ Current user lastSignInTime not found');
+            logger.debug(
+              'FamilyManage',
+              'current user lastSignInTime not found'
+            );
           }
         } else {
-          console.log('⚠️ Cannot access other user metadata from client side');
+          logger.debug('FamilyManage', 'cannot access other user metadata');
         }
-      } catch (authError) {
-        console.log('⚠️ Firebase Auth error:', authError);
+      } catch (authError: unknown) {
+        const err = authError as { code?: string; message?: string };
+        logger.warn('FamilyManage', 'firebase auth error', err);
       }
 
       // 방법 2: Firestore에서 사용자 정보 확인 (백업)
-      console.log('🔄 Trying Firestore backup method...');
+      logger.debug('FamilyManage', 'try Firestore backup method');
       const db = getFirestore();
       const userDoc = await getDoc(doc(db, 'users', userId));
 
       if (userDoc.exists()) {
+        logger.debug('FamilyManage', 'firestore user data');
         const userData = userDoc.data();
-        console.log('📄 Firestore user data:', userData);
 
         // 여러 가능한 필드명 확인 (우선순위 순서)
         const lastLoginTime =
@@ -387,13 +777,7 @@ function FamilyManage() {
           userData.lastSignInTime ||
           userData.lastLoginAt ||
           userData.lastLogin;
-        console.log('🕐 Firestore lastLoginTime:', lastLoginTime);
-        console.log('📊 Available login time fields:', {
-          lastLoginTime: userData.lastLoginTime,
-          lastSignInTime: userData.lastSignInTime,
-          lastLoginAt: userData.lastLoginAt,
-          lastLogin: userData.lastLogin,
-        });
+        logger.debug('FamilyManage', 'firestore lastLoginTime present');
 
         if (lastLoginTime) {
           let lastLogin: Date;
@@ -405,7 +789,7 @@ function FamilyManage() {
             'toDate' in lastLoginTime
           ) {
             lastLogin = lastLoginTime.toDate();
-            console.log('✅ Firebase Timestamp detected and converted');
+            logger.debug('FamilyManage', 'firebase Timestamp converted');
           } else if (
             lastLoginTime &&
             typeof lastLoginTime === 'object' &&
@@ -413,44 +797,38 @@ function FamilyManage() {
           ) {
             // Firestore Timestamp 형식 (seconds, nanoseconds)
             lastLogin = new Date(lastLoginTime.seconds * 1000);
-            console.log('✅ Firestore Timestamp detected and converted');
+            logger.debug('FamilyManage', 'firestore Timestamp converted');
           } else if (typeof lastLoginTime === 'string') {
             lastLogin = new Date(lastLoginTime);
-            console.log('✅ String timestamp detected and converted');
+            logger.debug('FamilyManage', 'string timestamp converted');
           } else if (typeof lastLoginTime === 'number') {
             lastLogin = new Date(lastLoginTime);
-            console.log('✅ Number timestamp detected and converted');
+            logger.debug('FamilyManage', 'number timestamp converted');
           } else {
-            console.log(
-              '❌ Unknown timestamp format:',
-              typeof lastLoginTime,
-              lastLoginTime
-            );
+            logger.warn('FamilyManage', 'unknown timestamp format');
             return { isOnline: false, lastLoginTime: null };
           }
 
           const now = new Date();
           const timeDiff = now.getTime() - lastLogin.getTime();
 
-          console.log('✅ Firestore lastLoginTime found:', lastLogin);
-          console.log('⏰ Time difference:', timeDiff / 1000 / 60, 'minutes');
+          logger.debug('FamilyManage', 'firestore lastLoginTime found');
 
           return {
             isOnline: timeDiff < 10 * 60 * 1000,
             lastLoginTime: lastLogin,
           };
         } else {
-          console.log('❌ Firestore lastLoginTime field not found');
-          console.log('🔍 Available fields:', Object.keys(userData));
+          logger.debug('FamilyManage', 'firestore lastLoginTime not found');
         }
       } else {
-        console.log('❌ Firestore user document does not exist');
+        logger.debug('FamilyManage', 'firestore user doc not exist');
       }
 
-      console.log('❌ No login time found from any source');
+      logger.debug('FamilyManage', 'no login time found');
       return { isOnline: false, lastLoginTime: null };
-    } catch (error) {
-      console.error('💥 Error checking online status:', error);
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'error checking online status', error);
       return { isOnline: false, lastLoginTime: null };
     }
   };
@@ -503,8 +881,12 @@ function FamilyManage() {
       }
 
       return { isOnline: false, lastLoginTime: null };
-    } catch (error) {
-      console.error('Error checking online status (optimized):', error);
+    } catch (error: unknown) {
+      logger.error(
+        'FamilyManage',
+        'error checking online status (optimized)',
+        error
+      );
       return { isOnline: false, lastLoginTime: null };
     }
   };
@@ -579,9 +961,9 @@ function FamilyManage() {
       await refetchGroups();
 
       // 성공 메시지 표시
-      alert('새 그룹이 성공적으로 생성되었습니다!');
-    } catch (error) {
-      console.error('Failed to create group:', error);
+      showSuccess('새 그룹이 성공적으로 생성되었습니다!');
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'create group failed', error);
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -595,19 +977,20 @@ function FamilyManage() {
   const handleCopyInviteCode = async () => {
     try {
       // Type assertion with proper interface
-      const groupWithInvite = group as any;
+      type GroupWithInvite = { inviteCode?: string };
+      const groupWithInvite = group as unknown as GroupWithInvite;
       if (groupWithInvite?.inviteCode) {
         await navigator.clipboard.writeText(groupWithInvite.inviteCode);
-        alert('초대 코드가 복사되었습니다!');
+        showSuccess('초대 코드가 복사되었습니다!');
       } else {
         // Generate new invite code if doesn't exist
         const newCode = await generateInviteCode();
         await navigator.clipboard.writeText(newCode);
-        alert('새 초대 코드가 생성되고 복사되었습니다!');
+        showSuccess('새 초대 코드가 생성되고 복사되었습니다!');
       }
-    } catch (error) {
-      console.error('Failed to copy invite code:', error);
-      alert('초대 코드 복사에 실패했습니다.');
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'copy invite code failed', error);
+      showError('초대 코드 복사에 실패했습니다.');
     }
   };
 
@@ -631,17 +1014,17 @@ function FamilyManage() {
       await refetchGroups();
 
       setShowQRScannerModal(false);
-      alert('가족 그룹에 성공적으로 참여했습니다!');
-    } catch (error) {
-      console.error('Failed to join group:', error);
+      showSuccess('가족 그룹에 성공적으로 참여했습니다!');
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'join group failed', error);
       const errorMessage =
         error instanceof Error ? error.message : '그룹 참여에 실패했습니다.';
-      alert(errorMessage);
+      showError(errorMessage);
     }
   };
 
   const handleQRScanError = (error: string) => {
-    alert(error);
+    showError(error);
     setShowQRScannerModal(false);
   };
 
@@ -651,7 +1034,7 @@ function FamilyManage() {
 
     // 권한 체크: 그룹장, 관리자, 부그룹장만 편집 가능
     const hasEditPermission =
-      group.ownerId === user?.uid ||
+      group?.ownerId === user?.uid ||
       currentUserRole === 'admin' ||
       currentUserRole === 'vice_owner';
 
@@ -659,7 +1042,7 @@ function FamilyManage() {
       setSelectedMember(member);
       setShowMemberEditModal(true);
     } else if (!hasEditPermission) {
-      alert(
+      showError(
         '멤버 편집 권한이 없습니다. 그룹장, 관리자, 부그룹장만 멤버를 편집할 수 있습니다.'
       );
     }
@@ -670,28 +1053,38 @@ function FamilyManage() {
 
     // 권한 체크: 그룹장, 관리자, 부그룹장만 제거 가능
     const hasRemovePermission =
-      group.ownerId === user?.uid ||
+      group?.ownerId === user?.uid ||
       currentUserRole === 'admin' ||
       currentUserRole === 'vice_owner';
 
     if (!hasRemovePermission) {
-      alert(
+      showError(
         '멤버 제거 권한이 없습니다. 그룹장, 관리자, 부그룹장만 멤버를 제거할 수 있습니다.'
       );
       return;
     }
 
-    if (confirm('정말로 이 멤버를 제거하시겠습니까?')) {
-      try {
-        if (selectedGroupId) {
-          await removeMember(selectedGroupId, memberId);
-          alert('멤버가 제거되었습니다.');
+    const member = members.find(m => m.userId === memberId);
+    setConfirmationData({
+      title: '멤버 제거',
+      message: `정말로 ${
+        member?.displayName || member?.userName || '이 멤버'
+      }를 제거하시겠습니까?`,
+      onConfirm: async () => {
+        try {
+          if (selectedGroupId) {
+            await removeMember(selectedGroupId, memberId);
+            showSuccess('멤버가 제거되었습니다.');
+          }
+        } catch (error: unknown) {
+          logger.error('FamilyManage', 'remove member failed', error);
+          showError('멤버 제거에 실패했습니다.');
         }
-      } catch (error) {
-        console.error('Failed to remove member:', error);
-        alert('멤버 제거에 실패했습니다.');
-      }
-    }
+      },
+      confirmText: '제거',
+      cancelText: '취소',
+    });
+    setShowConfirmationModal(true);
   };
 
   const handleChangeMemberRole = async (
@@ -702,12 +1095,12 @@ function FamilyManage() {
 
     // 권한 체크: 그룹장, 관리자, 부그룹장만 역할 변경 가능
     const hasRoleChangePermission =
-      group.ownerId === user?.uid ||
+      group?.ownerId === user?.uid ||
       currentUserRole === 'admin' ||
       currentUserRole === 'vice_owner';
 
     if (!hasRoleChangePermission) {
-      alert(
+      showError(
         '멤버 역할 변경 권한이 없습니다. 그룹장, 관리자, 부그룹장만 역할을 변경할 수 있습니다.'
       );
       return;
@@ -719,19 +1112,27 @@ function FamilyManage() {
       member: '멤버',
     };
 
-    if (
-      confirm(`이 멤버의 역할을 ${roleLabels[newRole]}로 변경하시겠습니까?`)
-    ) {
-      try {
-        if (selectedGroupId) {
-          await changeMemberRole(selectedGroupId, memberId, newRole);
-          alert(`멤버 역할이 ${roleLabels[newRole]}로 변경되었습니다.`);
+    const member = members.find(m => m.userId === memberId);
+    setConfirmationData({
+      title: '역할 변경',
+      message: `${
+        member?.displayName || member?.userName || '이 멤버'
+      }의 역할을 ${roleLabels[newRole]}로 변경하시겠습니까?`,
+      onConfirm: async () => {
+        try {
+          if (selectedGroupId) {
+            await changeMemberRole(selectedGroupId, memberId, newRole);
+            showSuccess(`멤버 역할이 ${roleLabels[newRole]}로 변경되었습니다.`);
+          }
+        } catch (error: unknown) {
+          logger.error('FamilyManage', 'change role failed', error);
+          showError('멤버 역할 변경에 실패했습니다.');
         }
-      } catch (error) {
-        console.error('Failed to change member role:', error);
-        alert('멤버 역할 변경에 실패했습니다.');
-      }
-    }
+      },
+      confirmText: '변경',
+      cancelText: '취소',
+    });
+    setShowConfirmationModal(true);
   };
 
   const handleTransferOwnership = async (memberId: string) => {
@@ -739,54 +1140,60 @@ function FamilyManage() {
 
     // 권한 체크: 그룹장과 부그룹장만 양도 가능
     const hasTransferPermission =
-      group.ownerId === user?.uid ||
-      (currentUserRole === 'vice_owner' && group.ownerId !== user?.uid);
+      group?.ownerId === user?.uid ||
+      (currentUserRole === 'vice_owner' && group?.ownerId !== user?.uid);
 
     if (!hasTransferPermission) {
-      alert(
+      showError(
         '그룹장 양도 권한이 없습니다. 그룹장과 부그룹장만 그룹장 권한을 양도할 수 있습니다.'
       );
       return;
     }
 
-    if (
-      confirm(
-        '정말로 그룹장 권한을 이 멤버에게 양도하시겠습니까? 이 작업은 되돌릴 수 없습니다.'
-      )
-    ) {
-      try {
-        if (selectedGroupId) {
-          // Note: ownerId update should be handled by the backend
-          await changeMemberRole(selectedGroupId, memberId, 'owner');
-          if (user?.uid) {
-            await changeMemberRole(selectedGroupId, user.uid, 'admin');
+    const member = members.find(m => m.userId === memberId);
+    setConfirmationData({
+      title: '그룹장 권한 양도',
+      message: `정말로 그룹장 권한을 ${
+        member?.displayName || member?.userName || '이 멤버'
+      }에게 양도하시겠습니까? 이 작업은 되돌릴 수 없습니다.`,
+      onConfirm: async () => {
+        try {
+          if (selectedGroupId) {
+            await transferOwnership(selectedGroupId, memberId);
+            showSuccess('그룹장 권한이 양도되었습니다.');
           }
-          alert('그룹장 권한이 양도되었습니다.');
+        } catch (error: unknown) {
+          logger.error('FamilyManage', 'transfer ownership failed', error);
+          showError('그룹장 권한 양도에 실패했습니다.');
         }
-      } catch (error) {
-        console.error('Failed to transfer ownership:', error);
-        alert('그룹장 권한 양도에 실패했습니다.');
-      }
-    }
+      },
+      confirmText: '양도',
+      cancelText: '취소',
+    });
+    setShowConfirmationModal(true);
   };
 
   const handleDeleteGroup = async () => {
-    if (
-      confirm(
-        '정말로 이 그룹을 삭제하시겠습니까? 모든 데이터가 영구적으로 삭제됩니다.'
-      )
-    ) {
-      try {
-        if (selectedGroupId) {
-          await deleteGroup(selectedGroupId);
-          setSelectedGroupId(null);
-          alert('그룹이 삭제되었습니다.');
+    setConfirmationData({
+      title: '그룹 삭제',
+      message:
+        '정말로 이 그룹을 삭제하시겠습니까? 모든 데이터가 영구적으로 삭제됩니다.',
+      onConfirm: async () => {
+        try {
+          if (selectedGroupId) {
+            await deleteGroup(selectedGroupId);
+            setSelectedGroupId(null);
+            showSuccess('그룹이 삭제되었습니다.');
+          }
+        } catch (error: unknown) {
+          logger.error('FamilyManage', 'delete group failed', error);
+          showError('그룹 삭제에 실패했습니다.');
         }
-      } catch (error) {
-        console.error('Failed to delete group:', error);
-        alert('그룹 삭제에 실패했습니다.');
-      }
-    }
+      },
+      confirmText: '삭제',
+      cancelText: '취소',
+    });
+    setShowConfirmationModal(true);
   };
 
   const handleInviteMember = () => {
@@ -801,16 +1208,55 @@ function FamilyManage() {
     setShowSettingsModal(true);
   };
 
+  // 승인 관련 핸들러
+  const loadPendingInvitations = async () => {
+    if (!selectedGroupId) return;
+
+    try {
+      const invitations = await getPendingInvitations();
+      setPendingInvitations(invitations);
+    } catch (error) {
+      logger.error('FamilyManage', 'load pending invitations failed', error);
+      showError('대기 중인 초대를 불러오는데 실패했습니다.');
+    }
+  };
+
+  const handleApproveInvitation = async (
+    invitationId: string,
+    userId: string,
+    role: string
+  ) => {
+    try {
+      await approveInvitation(invitationId, userId, role);
+      showSuccess(t('common.success'));
+      await loadPendingInvitations(); // 목록 새로고침
+    } catch (error) {
+      logger.error('FamilyManage', 'approve invitation failed', error);
+      showError(t('common.error'));
+    }
+  };
+
+  const handleRejectInvitation = async (invitationId: string) => {
+    try {
+      await rejectInvitation(invitationId);
+      showSuccess(t('common.success'));
+      await loadPendingInvitations(); // 목록 새로고침
+    } catch (error) {
+      logger.error('FamilyManage', 'reject invitation failed', error);
+      showError(t('common.error'));
+    }
+  };
+
   const handleSendInvite = async () => {
     if (inviteEmail.trim() && selectedGroupId) {
       try {
         await inviteByEmail(selectedGroupId, inviteEmail, inviteRole);
-        alert(`${inviteEmail}에게 초대장을 보냈습니다.`);
+        showSuccess(`${inviteEmail}에게 초대장을 보냈습니다.`);
         setInviteEmail('');
         setShowInviteModal(false);
-      } catch (error) {
-        console.error('Failed to send invite:', error);
-        alert('초대장 발송에 실패했습니다.');
+      } catch (error: unknown) {
+        logger.error('FamilyManage', 'send invite failed', error);
+        showError('초대장 발송에 실패했습니다.');
       }
     }
   };
@@ -819,16 +1265,13 @@ function FamilyManage() {
     memberId: string,
     updates: Partial<ExtendedGroupMember>
   ) => {
-    const currentUserRole = members.find(m => m.userId === user?.uid)?.role;
+    const isGroupMember = !!members.find(m => m.userId === user?.uid);
 
-    // 권한 체크: 그룹장, 관리자, 부그룹장만 업데이트 가능
-    const hasUpdatePermission =
-      group.ownerId === user?.uid ||
-      currentUserRole === 'admin' ||
-      currentUserRole === 'vice_owner';
+    // 권한 체크 완화: 그룹에 속한 구성원이라면 멤버 정보(역할 포함) 수정 가능
+    const hasUpdatePermission = isGroupMember;
 
     if (!hasUpdatePermission) {
-      alert(
+      showError(
         '멤버 정보 업데이트 권한이 없습니다. 그룹장, 관리자, 부그룹장만 멤버 정보를 수정할 수 있습니다.'
       );
       return;
@@ -840,7 +1283,7 @@ function FamilyManage() {
         await changeMemberRole(selectedGroupId, memberId, updates.role);
       }
 
-      alert('멤버 정보가 업데이트되었습니다.');
+      showSuccess('멤버 정보가 업데이트되었습니다.');
       setShowMemberEditModal(false);
       setSelectedMember(null);
 
@@ -848,37 +1291,46 @@ function FamilyManage() {
       if (selectedGroupId) {
         await refetchGroups();
       }
-    } catch (error) {
-      console.error('Failed to update member:', error);
-      alert('멤버 정보 업데이트에 실패했습니다.');
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'update member failed', error);
+      showError('멤버 정보 업데이트에 실패했습니다.');
     }
   };
 
-  const handleUpdateGroup = async (updates: any) => {
+  const handleUpdateGroup = async (updates: UpdateGroupInput) => {
     try {
       if (selectedGroupId) {
         await updateGroup(selectedGroupId, updates);
-        alert('그룹 정보가 업데이트되었습니다.');
+        showSuccess('그룹 정보가 업데이트되었습니다.');
         setShowEditGroupModal(false);
       }
-    } catch (error) {
-      console.error('Failed to update group:', error);
-      alert('그룹 업데이트에 실패했습니다.');
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'update group failed', error);
+      showError('그룹 업데이트에 실패했습니다.');
     }
   };
 
-  const handleUpdateSettings = async (settings: any) => {
+  type GroupSettingsExtra = {
+    maxMembers?: number;
+    allowChildrenToInvite?: boolean;
+    requireApproval?: boolean;
+    enableViceOwner?: boolean;
+    enablePointsManagement?: boolean;
+  };
+  const handleUpdateSettings = async (
+    settings: Partial<Group['settings']> & Partial<GroupSettingsExtra>
+  ) => {
     try {
       if (selectedGroupId && group) {
         await updateGroup(selectedGroupId, {
           settings: { ...group.settings, ...settings },
         });
-        alert('그룹 설정이 업데이트되었습니다.');
+        showSuccess('그룹 설정이 업데이트되었습니다.');
         setShowSettingsModal(false);
       }
-    } catch (error) {
-      console.error('Failed to update settings:', error);
-      alert('설정 업데이트에 실패했습니다.');
+    } catch (error: unknown) {
+      logger.error('FamilyManage', 'update settings failed', error);
+      showError('설정 업데이트에 실패했습니다.');
     }
   };
 
@@ -887,11 +1339,73 @@ function FamilyManage() {
     navigate(`/tasks/${taskId}`);
   };
 
+  // 필터 상태
+  const [taskFilters, setTaskFilters] = useState<{
+    assigneeId: string;
+    status: 'all' | 'completed' | 'pending' | 'in_progress';
+  }>({ assigneeId: 'all', status: 'all' });
+
+  // 담당자 옵션 (그룹 멤버 우선, 없으면 할일 목록에서 수집)
+  const assigneeOptions = useMemo(() => {
+    const opts: Array<{ id: string; name: string }> = [];
+    const pushIfNotExists = (id: string, name: string) => {
+      if (!id) return;
+      if (!opts.some(o => o.id === id)) opts.push({ id, name });
+    };
+
+    if (Array.isArray(members) && members.length > 0) {
+      members.forEach(
+        (m: { userId: string; userName?: string; displayName?: string }) =>
+          pushIfNotExists(m.userId, m.userName || m.displayName || '알 수 없음')
+      );
+    } else if (Array.isArray(tasks)) {
+      tasks.forEach(t =>
+        pushIfNotExists(t.assigneeId, t.assigneeName || '담당자')
+      );
+    }
+
+    return [
+      { id: 'all', name: '전체' },
+      { id: user?.uid || '', name: '나' },
+      ...opts.filter(o => o.id && o.id !== (user?.uid || '')),
+    ];
+  }, [members, tasks, user]);
+
+  // 날짜 필터 제거됨
+
+  // 필터 적용된 할일 목록
+  const filteredTasksForDisplay = useMemo(() => {
+    let list = Array.isArray(tasks) ? [...tasks] : [];
+
+    // 담당자
+    if (taskFilters.assigneeId && taskFilters.assigneeId !== 'all') {
+      list = list.filter(t => t.assigneeId === taskFilters.assigneeId);
+    }
+
+    // 상태
+    if (taskFilters.status !== 'all') {
+      list = list.filter(t => t.status === taskFilters.status);
+    }
+
+    // 날짜 필터 제거됨
+
+    return list;
+  }, [tasks, taskFilters]);
+
+  // 필터 변경 시 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentTaskPage(1);
+  }, [taskFilters]);
+
   // 페이지네이션 계산
-  const totalTaskPages = tasks ? Math.ceil(tasks.length / tasksPerPage) : 0;
+  const totalTaskPages = filteredTasksForDisplay
+    ? Math.ceil(filteredTasksForDisplay.length / tasksPerPage)
+    : 0;
   const startTaskIndex = (currentTaskPage - 1) * tasksPerPage;
   const endTaskIndex = startTaskIndex + tasksPerPage;
-  const currentTasks = tasks ? tasks.slice(startTaskIndex, endTaskIndex) : [];
+  const currentTasks = filteredTasksForDisplay
+    ? filteredTasksForDisplay.slice(startTaskIndex, endTaskIndex)
+    : [];
 
   // 페이지 변경 핸들러
   const handleTaskPageChange = (page: number) => {
@@ -984,8 +1498,7 @@ function FamilyManage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <LoadingSpinner size="lg" text="가족 정보를 불러오는 중..." />
         </div>
@@ -996,8 +1509,7 @@ function FamilyManage() {
   // 그룹이 없을 때의 화면
   if (!selectedGroupId || !group) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-        <WaveBackground />
+      <div className="min-h-screen">
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <GlassCard variant="light" className="p-8 max-w-md">
             <Typography.H3 className="text-white mb-4">
@@ -1190,9 +1702,7 @@ function FamilyManage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-400 to-purple-600">
-      <WaveBackground />
-
+    <div className="min-h-screen">
       <div
         className="relative z-10 max-w-6xl xl:max-w-7xl 2xl:max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 sm:py-8 lg:py-12 xl:py-16 fixed-header-spacing"
         style={{ paddingTop: '120px' }}
@@ -1202,7 +1712,7 @@ function FamilyManage() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-6">
             <div className="flex-1 min-w-0">
               <Typography.H2 className="text-white mb-2 text-xl sm:text-2xl lg:text-3xl break-keep-ko">
-                {groups && groups.length > 1 ? '그룹 관리' : '가족 관리'}
+                그룹 관리
               </Typography.H2>
               <Typography.Body className="text-white/90 text-sm sm:text-base break-keep-ko">
                 {groups && groups.length > 1
@@ -1334,11 +1844,9 @@ function FamilyManage() {
                   {group.name}
                 </Typography.H3>
                 {favoriteGroups.includes(group.id) && (
-                  <Star
-                    size={20}
-                    className="text-yellow-400 fill-current"
-                    title="즐겨찾기 그룹"
-                  />
+                  <span title="즐겨찾기 그룹">
+                    <Star size={20} className="text-yellow-400 fill-current" />
+                  </span>
                 )}
                 {sortedGroups && sortedGroups.length > 1 && (
                   <span className="px-2 py-1 bg-white/20 rounded-full text-white/80 text-xs">
@@ -1402,12 +1910,16 @@ function FamilyManage() {
                   초대 코드
                 </p>
                 <p className="text-white text-lg lg:text-xl font-mono font-bold">
-                  {(group as any)?.inviteCode || '코드 생성 필요'}
+                  {(group as unknown as { inviteCode?: string })?.inviteCode ||
+                    '코드 생성 필요'}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-white/60 text-sm font-pretendard">
-                  최대 {(group.settings as any)?.maxMembers || 10}명
+                  최대{' '}
+                  {(group.settings as unknown as { maxMembers?: number })
+                    ?.maxMembers || 10}
+                  명
                 </p>
               </div>
             </div>
@@ -1850,20 +2362,170 @@ function FamilyManage() {
           </GlassCard>
         )}
 
+        {/* 승인 대기 섹션 */}
+        {pendingInvitations.length > 0 && (
+          <GlassCard variant="light" className="p-6 lg:p-8 mb-8 mt-12">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <Typography.H3 className="text-white font-pretendard">
+                  {t('family.pendingApprovals', { defaultValue: '승인 대기' })}
+                </Typography.H3>
+                <Typography.Caption className="text-white/60">
+                  {t('family.pendingApprovalsDesc', {
+                    defaultValue: '그룹 참여 요청을 승인하거나 거부하세요',
+                  })}
+                </Typography.Caption>
+              </div>
+              <Typography.Body className="text-white/80 font-pretendard">
+                {pendingInvitations.length}
+                {t('family.pendingCountSuffix', {
+                  defaultValue: '개의 대기 요청',
+                })}
+              </Typography.Body>
+            </div>
+
+            <div className="space-y-4">
+              {pendingInvitations.map(invitation => (
+                <div
+                  key={invitation.id}
+                  className="p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <Typography.Body className="text-white font-semibold mb-1">
+                        {(invitation.invitedUserId as string) ||
+                          '알 수 없는 사용자'}
+                      </Typography.Body>
+                      <Typography.Caption className="text-white/70">
+                        역할:{' '}
+                        {invitation.role === 'member'
+                          ? '멤버'
+                          : invitation.role === 'admin'
+                          ? '관리자'
+                          : invitation.role}{' '}
+                        • 요청일:{' '}
+                        {(() => {
+                          const c = invitation.createdAt;
+                          if (!c) return '알 수 없음';
+                          let d: Date | null = null;
+                          if (typeof c === 'string') d = new Date(c);
+                          else if (c instanceof Date) d = c;
+                          else if (
+                            typeof c === 'object' &&
+                            c !== null &&
+                            'toDate' in (c as Record<string, unknown>) &&
+                            typeof (c as { toDate?: unknown }).toDate ===
+                              'function'
+                          ) {
+                            d = (c as { toDate: () => Date }).toDate();
+                          }
+                          return d
+                            ? d.toLocaleDateString('ko-KR')
+                            : '알 수 없음';
+                        })()}
+                      </Typography.Caption>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <WaveButton
+                        variant="primary"
+                        size="sm"
+                        onClick={() =>
+                          handleApproveInvitation(
+                            invitation.id,
+                            String(invitation.invitedUserId || ''),
+                            String(invitation.role || 'member')
+                          )
+                        }
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {t('common.confirm')}
+                      </WaveButton>
+                      <WaveButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRejectInvitation(invitation.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        {t('common.cancel')}
+                      </WaveButton>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
+
         {/* 할일 목록 섹션 */}
         <GlassCard variant="light" className="p-6 lg:p-8 mb-8 mt-12">
           <div className="flex items-center justify-between mb-6">
             <div>
               <Typography.H3 className="text-white font-pretendard">
-                할일 목록
+                {t('tasks.title')}
               </Typography.H3>
               <Typography.Caption className="text-white/60">
                 할일을 클릭하면 상세 페이지로 이동합니다
               </Typography.Caption>
             </div>
-            <Typography.Body className="text-white/80 font-pretendard">
-              총 {tasks?.length || 0}개의 할일
-            </Typography.Body>
+            <div className="flex flex-col items-end gap-2">
+              <Typography.Body className="text-white/80 font-pretendard">
+                {startTaskIndex + 1}-
+                {Math.min(endTaskIndex, filteredTasksForDisplay.length || 0)} /{' '}
+                {filteredTasksForDisplay.length || 0}개
+              </Typography.Body>
+
+              {/* 필터 UI */}
+              <div className="flex items-center gap-2">
+                {/* 담당자 */}
+                <select
+                  value={taskFilters.assigneeId}
+                  onChange={e =>
+                    setTaskFilters(prev => ({
+                      ...prev,
+                      assigneeId: e.target.value,
+                    }))
+                  }
+                  className="px-2 py-1 rounded-md bg-white/10 text-white border border-white/20 mw-select"
+                >
+                  {assigneeOptions.map(opt => (
+                    <option key={opt.id || 'none'} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* 상태 */}
+                <select
+                  value={taskFilters.status}
+                  onChange={e =>
+                    setTaskFilters(prev => ({
+                      ...prev,
+                      status: e.target.value as typeof taskFilters.status,
+                    }))
+                  }
+                  className="px-2 py-1 rounded-md bg-white/10 text-white border border-white/20 mw-select"
+                >
+                  <option value="all">전체</option>
+                  <option value="completed">완료</option>
+                  <option value="in_progress">진행중</option>
+                  <option value="pending">대기중</option>
+                </select>
+
+                {/* 날짜 필터 제거됨 */}
+
+                {/* 초기화 */}
+                <WaveButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setTaskFilters({ assigneeId: 'all', status: 'all' })
+                  }
+                  className="text-white/80 hover:text-white"
+                >
+                  초기화
+                </WaveButton>
+              </div>
+            </div>
           </div>
 
           {tasks && tasks.length > 0 ? (
@@ -1880,6 +2542,34 @@ function FamilyManage() {
                         <Typography.Body className="text-white font-semibold">
                           {task.title}
                         </Typography.Body>
+                        {/* 상태 배지 */}
+                        <Badge
+                          variant={
+                            task.status === 'completed'
+                              ? 'success' // 녹색
+                              : task.status === 'in_progress'
+                              ? 'info' // 파랑
+                              : 'warning' // 노랑 (대기중)
+                          }
+                          className="ml-1 flex items-center gap-1 px-2 py-0.5 border-white/20 backdrop-blur-sm"
+                        >
+                          {task.status === 'completed' && (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
+                          {task.status === 'in_progress' && (
+                            <Clock className="h-3 w-3" />
+                          )}
+                          {task.status === 'pending' && (
+                            <Circle className="h-3 w-3" />
+                          )}
+                          <span className="font-pretendard">
+                            {task.status === 'completed'
+                              ? '완료'
+                              : task.status === 'in_progress'
+                              ? '진행중'
+                              : '대기중'}
+                          </span>
+                        </Badge>
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <Typography.Caption className="text-white/60">
                             클릭하여 상세보기 →
@@ -1889,13 +2579,7 @@ function FamilyManage() {
                       <Typography.Caption className="text-white/70">
                         담당자:{' '}
                         {task.assigneeId === user?.uid ? '나' : '다른 구성원'} •
-                        상태:{' '}
-                        {task.status === 'completed'
-                          ? '완료'
-                          : task.status === 'in_progress'
-                          ? '진행중'
-                          : '대기중'}{' '}
-                        • 우선순위:{' '}
+                        우선순위:{' '}
                         {task.priority === 'high'
                           ? '높음'
                           : task.priority === 'medium'
@@ -2051,21 +2735,25 @@ function FamilyManage() {
             <GroupChat
               groupId={selectedGroupId}
               groupName={group.name}
-              members={members.map(member => ({
+              members={members.map((member: GroupMember) => ({
                 userId: member.userId,
-                displayName: member.displayName,
+                displayName:
+                  (
+                    member as unknown as {
+                      displayName?: string;
+                      userName?: string;
+                    }
+                  ).displayName ?? member.userName,
                 userName: member.userName,
-                avatar: member.avatar,
+                avatar:
+                  (member as unknown as { avatar?: string }).avatar ??
+                  member.userAvatar,
               }))}
               onOpenFullscreen={data => {
-                console.log('GroupChat에서 전체화면 모달 열기 요청:', data);
-                console.log('현재 모달 상태:', {
-                  showFullscreenChatModal,
-                  fullscreenChatData,
-                });
+                logger.debug('FamilyManage', 'open fullscreen from GroupChat');
                 setFullscreenChatData(data);
                 setShowFullscreenChatModal(true);
-                console.log('모달 상태 업데이트 완료');
+                logger.debug('FamilyManage', 'modal state updated');
               }}
             />
           </div>
@@ -2138,7 +2826,11 @@ function FamilyManage() {
                 <input
                   type="checkbox"
                   checked={
-                    (group.settings as any)?.allowChildrenToInvite || false
+                    (
+                      group.settings as unknown as {
+                        allowChildrenToInvite?: boolean;
+                      }
+                    )?.allowChildrenToInvite || false
                   }
                   onChange={e =>
                     handleUpdateSettings({
@@ -2152,7 +2844,10 @@ function FamilyManage() {
                 <span className="text-white/80">초대 승인 필요</span>
                 <input
                   type="checkbox"
-                  checked={(group.settings as any)?.requireApproval || false}
+                  checked={
+                    (group.settings as unknown as { requireApproval?: boolean })
+                      ?.requireApproval || false
+                  }
                   onChange={e =>
                     handleUpdateSettings({ requireApproval: e.target.checked })
                   }
@@ -2163,7 +2858,10 @@ function FamilyManage() {
                 <span className="text-white/80">부그룹장 권한 활성화</span>
                 <input
                   type="checkbox"
-                  checked={(group.settings as any)?.enableViceOwner || false}
+                  checked={
+                    (group.settings as unknown as { enableViceOwner?: boolean })
+                      ?.enableViceOwner || false
+                  }
                   onChange={e =>
                     handleUpdateSettings({ enableViceOwner: e.target.checked })
                   }
@@ -2175,7 +2873,11 @@ function FamilyManage() {
                 <input
                   type="checkbox"
                   checked={
-                    (group.settings as any)?.enablePointsManagement || false
+                    (
+                      group.settings as unknown as {
+                        enablePointsManagement?: boolean;
+                      }
+                    )?.enablePointsManagement || false
                   }
                   onChange={e =>
                     handleUpdateSettings({
@@ -2238,7 +2940,7 @@ function FamilyManage() {
                         }));
                       };
                       updateOnlineStatus();
-                      alert('온라인 상태를 새로고침했습니다!');
+                      showSuccess('온라인 상태를 새로고침했습니다!');
                     }
                   }}
                   className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
@@ -2252,7 +2954,10 @@ function FamilyManage() {
                 </label>
                 <input
                   type="number"
-                  value={(group.settings as any)?.maxMembers || 10}
+                  value={
+                    (group.settings as unknown as { maxMembers?: number })
+                      ?.maxMembers || 10
+                  }
                   onChange={e =>
                     handleUpdateSettings({
                       maxMembers: parseInt(e.target.value),
@@ -2643,10 +3348,13 @@ function FamilyManage() {
         <QRInviteModal
           isOpen={showQRInviteModal}
           onClose={() => setShowQRInviteModal(false)}
-          inviteCode={(group as any)?.inviteCode || '코드 생성 필요'}
+          inviteCode={
+            (group as unknown as { inviteCode?: string })?.inviteCode ||
+            '코드 생성 필요'
+          }
           groupName={group.name}
           inviteUrl={`${window.location.origin}/join/${
-            (group as any)?.inviteCode || 'code'
+            (group as unknown as { inviteCode?: string })?.inviteCode || 'code'
           }`}
         />
       )}
@@ -2682,13 +3390,25 @@ function FamilyManage() {
                 groupName={fullscreenChatData.groupName}
                 members={fullscreenChatData.members}
                 onOpenFullscreen={() => {
-                  // 전체화면 모달에서는 전체화면 기능 비활성화
-                  console.log('이미 전체화면 모드입니다');
+                  logger.debug('FamilyManage', 'already fullscreen mode');
                 }}
               />
             </div>
           </div>
         </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmationModal && confirmationData && (
+        <ConfirmationModal
+          isOpen={showConfirmationModal}
+          onClose={() => setShowConfirmationModal(false)}
+          title={confirmationData.title}
+          message={confirmationData.message}
+          onConfirm={confirmationData.onConfirm}
+          confirmText={confirmationData.confirmText}
+          cancelText={confirmationData.cancelText}
+        />
       )}
     </div>
   );

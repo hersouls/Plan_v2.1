@@ -1,4 +1,6 @@
 // PWA utilities for service worker registration and management
+import logger from '../lib/logger';
+
 export interface PWAInstallPrompt extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
@@ -28,14 +30,14 @@ export class PWAManager {
       try {
         await this.registerServiceWorker();
       } catch (error) {
-        console.error('Service Worker registration failed:', error);
+        logger.error('pwa', 'service worker registration failed', error);
       }
     }
   }
 
   private listenForInstallPrompt() {
     window.addEventListener('beforeinstallprompt', event => {
-      console.log('PWA install prompt available');
+      logger.info('pwa', 'install prompt available');
 
       // Prevent the default install prompt
       event.preventDefault();
@@ -50,7 +52,7 @@ export class PWAManager {
 
   async registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
     if (!('serviceWorker' in navigator)) {
-      console.warn('Service Worker not supported');
+      logger.warn('pwa', 'service worker not supported');
       return null;
     }
 
@@ -61,11 +63,11 @@ export class PWAManager {
 
       this.registration = registration;
 
-      console.log('Service Worker registered successfully');
+      logger.info('pwa', 'service worker registered successfully');
 
       // Listen for updates
       registration.addEventListener('updatefound', () => {
-        console.log('Service Worker update found');
+        logger.info('pwa', 'service worker update found');
 
         const newWorker = registration.installing;
         if (newWorker) {
@@ -74,7 +76,10 @@ export class PWAManager {
               newWorker.state === 'installed' &&
               navigator.serviceWorker.controller
             ) {
-              console.log('New Service Worker installed, update available');
+              logger.info(
+                'pwa',
+                'new service worker installed - update available'
+              );
               window.dispatchEvent(
                 new CustomEvent('sw-update-available', {
                   detail: { registration },
@@ -87,14 +92,14 @@ export class PWAManager {
 
       return registration;
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      logger.error('pwa', 'service worker registration failed', error);
       return null;
     }
   }
 
   async promptInstall(): Promise<boolean> {
     if (!this.installPrompt) {
-      console.warn('Install prompt not available');
+      logger.warn('pwa', 'install prompt not available');
       return false;
     }
 
@@ -108,10 +113,10 @@ export class PWAManager {
       // Clear the stored prompt
       this.installPrompt = null;
 
-      console.log('Install prompt result:', result.outcome);
+      logger.info('pwa', 'install prompt result', result.outcome);
       return result.outcome === 'accepted';
     } catch (error) {
-      console.error('Install prompt failed:', error);
+      logger.error('pwa', 'install prompt failed', error);
       return false;
     }
   }
@@ -123,13 +128,14 @@ export class PWAManager {
   isStandalone(): boolean {
     return (
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true
+      (window.navigator as unknown as { standalone?: boolean }).standalone ===
+        true
     );
   }
 
   async updateServiceWorker(): Promise<void> {
     if (!this.registration) {
-      console.warn('No service worker registration available');
+      logger.warn('pwa', 'no service worker registration available');
       return;
     }
 
@@ -147,7 +153,7 @@ export class PWAManager {
         });
       }
     } catch (error) {
-      console.error('Service Worker update failed:', error);
+      logger.error('pwa', 'service worker update failed', error);
     }
   }
 
@@ -175,7 +181,7 @@ export class PWAManager {
         resolve(event.data);
       };
 
-      this.registration!.active!.postMessage({ type: 'GET_CACHE_STATUS' }, [
+      this.registration?.active?.postMessage({ type: 'GET_CACHE_STATUS' }, [
         messageChannel.port2,
       ]);
 
@@ -191,35 +197,23 @@ export class PWAManager {
         await Promise.all(
           cacheNames.map(cacheName => caches.delete(cacheName))
         );
-        console.log('All caches cleared');
+        logger.info('pwa', 'all caches cleared');
       } catch (error) {
-        console.error('Failed to clear caches:', error);
+        logger.error('pwa', 'failed to clear caches', error);
       }
     }
   }
 
   // Background sync helpers
-  async registerBackgroundSync(tag: string): Promise<void> {
-    if (
-      !this.registration ||
-      !('sync' in window.ServiceWorkerRegistration.prototype)
-    ) {
-      console.warn('Background sync not supported');
-      return;
-    }
-
-    try {
-      await this.registration.sync.register(tag);
-      console.log('Background sync registered:', tag);
-    } catch (error) {
-      console.error('Background sync registration failed:', error);
-    }
+  async registerBackgroundSync(_tag: string): Promise<void> {
+    // Background Sync는 브라우저 지원 편차가 크므로 우회 처리
+    logger.warn('pwa', 'background sync not supported or disabled');
   }
 
   // Notification helpers
   async requestNotificationPermission(): Promise<NotificationPermission> {
     if (!('Notification' in window)) {
-      console.warn('Notifications not supported');
+      logger.warn('pwa', 'notifications not supported');
       return 'denied';
     }
 
@@ -237,7 +231,7 @@ export class PWAManager {
     const permission = await this.requestNotificationPermission();
 
     if (permission !== 'granted') {
-      console.warn('Notification permission denied');
+      logger.warn('pwa', 'notification permission denied');
       return;
     }
 
@@ -260,7 +254,7 @@ export class PWAManager {
   // Share API helpers
   async shareContent(data: ShareData): Promise<boolean> {
     if (!('share' in navigator)) {
-      console.warn('Web Share API not supported');
+      logger.warn('pwa', 'Web Share API not supported');
       return false;
     }
 
@@ -269,7 +263,7 @@ export class PWAManager {
       return true;
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('Share failed:', error);
+        logger.error('pwa', 'share failed', error);
       }
       return false;
     }
@@ -347,9 +341,7 @@ export const addPWAEventListeners = (callbacks: {
       window.removeEventListener('pwa-install-available', onInstallAvailable);
     }
     if (onUpdateAvailable) {
-      window.removeEventListener('sw-update-available', event => {
-        onUpdateAvailable((event as CustomEvent).detail.registration);
-      });
+      // Note: cannot remove anonymous listener; expose a disposer if needed
     }
     if (onOffline) {
       window.removeEventListener('offline', onOffline);

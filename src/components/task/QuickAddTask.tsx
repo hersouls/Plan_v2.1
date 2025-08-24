@@ -1,21 +1,23 @@
+import { GlassCard } from '@/components/ui/GlassCard';
+import { WaveButton } from '@/components/ui/WaveButton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { GlassCard } from '@/components/ui/GlassCard';
 import { Input } from '@/components/ui/input';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useToast } from '@/components/ui/useToast';
 import { cn } from '@/components/ui/utils';
-import { WaveButton } from '@/components/ui/WaveButton';
+import logger from '@/lib/logger';
 import { TaskCategory, TaskPriority } from '@/types/task';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
   Briefcase,
   Calendar,
+  Clock,
   Flag,
   Home,
   Lightbulb,
@@ -25,7 +27,14 @@ import {
   User,
   Users,
 } from 'lucide-react';
-import React, { KeyboardEvent, useEffect, useRef, useState } from 'react';
+import React, {
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 // Enhanced natural language parsing patterns
 const DATE_PATTERNS = {
@@ -89,12 +98,14 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
   showSuggestions = true,
   expandable = true,
 }) => {
+  const toast = useToast();
   const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [category, setCategory] = useState<TaskCategory>('personal');
   const [dueDate, setDueDate] = useState<Date>();
   const [assigneeId, setAssigneeId] = useState<string>(defaultAssigneeId || '');
+  const [dueTime, setDueTime] = useState<string>('');
   const [taskType, setTaskType] = useState<'personal' | 'group'>('personal');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
@@ -109,142 +120,169 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
   }>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const parseNaturalLanguage = (text: string) => {
-    if (!enhancedParsing) {
-      return {
-        title: text.trim(),
-        priority: priority,
-        category: category,
-        dueDate: dueDate,
-        tags: tags,
-        taskType: taskType,
-        groupId: taskType === 'group' ? selectedGroupId : undefined,
-      };
-    }
-
-    let parsedTitle = text;
-    let parsedPriority: TaskPriority = 'medium';
-    let parsedCategory: TaskCategory = 'personal';
-    let parsedDueDate: Date | undefined;
-    const parsedTags: string[] = [];
-
-    // Enhanced priority extraction using patterns
-    Object.entries(PRIORITY_PATTERNS).forEach(([priorityLevel, pattern]) => {
-      if (pattern.test(text)) {
-        parsedPriority = priorityLevel as TaskPriority;
-        parsedTitle = parsedTitle.replace(pattern, '').trim();
-      }
+  // Deduplicate group members by id to avoid duplicate entries in UI
+  const uniqueGroupMembers = useMemo(() => {
+    const seen = new Set<string>();
+    return (groupMembers || []).filter(member => {
+      if (!member || !member.id) return false;
+      if (seen.has(member.id)) return false;
+      seen.add(member.id);
+      return true;
     });
+  }, [groupMembers]);
 
-    // Enhanced category extraction using patterns
-    Object.entries(CATEGORY_PATTERNS).forEach(([categoryType, pattern]) => {
-      if (pattern.test(text)) {
-        parsedCategory = categoryType as TaskCategory;
-        parsedTitle = parsedTitle.replace(pattern, '').trim();
+  const parseNaturalLanguage = useCallback(
+    (text: string) => {
+      if (!enhancedParsing) {
+        return {
+          title: text.trim(),
+          priority: priority,
+          category: category,
+          dueDate: dueDate,
+          tags: tags,
+          taskType: taskType,
+          groupId: taskType === 'group' ? selectedGroupId : undefined,
+        };
       }
-    });
 
-    // Legacy category parsing with @ symbol
-    if (text.includes('@집안일')) {
-      parsedCategory = 'household';
-      parsedTitle = parsedTitle.replace('@집안일', '').trim();
-    } else if (text.includes('@업무')) {
-      parsedCategory = 'work';
-      parsedTitle = parsedTitle.replace('@업무', '').trim();
-    } else if (text.includes('@쇼핑')) {
-      parsedCategory = 'shopping';
-      parsedTitle = parsedTitle.replace('@쇼핑', '').trim();
-    } else if (text.includes('@개인')) {
-      parsedCategory = 'personal';
-      parsedTitle = parsedTitle.replace('@개인', '').trim();
-    }
+      let parsedTitle = text;
+      let parsedPriority: TaskPriority = 'medium';
+      let parsedCategory: TaskCategory = 'personal';
+      let parsedDueDate: Date | undefined;
+      const parsedTags: string[] = [];
 
-    // Enhanced date extraction using patterns
-    Object.entries(DATE_PATTERNS).forEach(([dateType, pattern]) => {
-      if (pattern.test(text)) {
-        const today = new Date();
-        switch (dateType) {
-          case 'today':
-            parsedDueDate = today;
-            break;
-          case 'tomorrow':
-            parsedDueDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-            break;
-          case 'nextWeek':
-            parsedDueDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-            break;
-          case 'afterDays': {
-            const match = text.match(/(\d+)일\s?후|in\s?(\d+)\s?days?/gi);
-            if (match) {
-              const days = parseInt(match[0].match(/\d+/)?.[0] || '1');
-              parsedDueDate = new Date(
-                today.getTime() + days * 24 * 60 * 60 * 1000
-              );
-            }
-            break;
-          }
+      // Enhanced priority extraction using patterns
+      Object.entries(PRIORITY_PATTERNS).forEach(([priorityLevel, pattern]) => {
+        if (pattern.test(text)) {
+          parsedPriority = priorityLevel as TaskPriority;
+          parsedTitle = parsedTitle.replace(pattern, '').trim();
         }
-        parsedTitle = parsedTitle.replace(pattern, '').trim();
-      }
-    });
-
-    // Legacy date parsing
-    if (text.includes('모레')) {
-      parsedDueDate = new Date();
-      parsedDueDate.setDate(parsedDueDate.getDate() + 2);
-      parsedTitle = parsedTitle.replace('모레', '').trim();
-    }
-
-    // Tags 파싱
-    const tagMatches = text.match(/#\S+/g);
-    if (tagMatches) {
-      tagMatches.forEach(tag => {
-        parsedTags.push(tag.substring(1));
-        parsedTitle = parsedTitle.replace(tag, '').trim();
       });
-    }
 
-    // "까지" 제거
-    parsedTitle = parsedTitle.replace(/까지/g, '').trim();
+      // Enhanced category extraction using patterns
+      Object.entries(CATEGORY_PATTERNS).forEach(([categoryType, pattern]) => {
+        if (pattern.test(text)) {
+          parsedCategory = categoryType as TaskCategory;
+          parsedTitle = parsedTitle.replace(pattern, '').trim();
+        }
+      });
 
-    return {
-      title: parsedTitle,
-      priority: parsedPriority,
-      category: parsedCategory,
-      tags: parsedTags,
-      dueDate: parsedDueDate,
-    };
-  };
+      // Legacy category parsing with @ symbol
+      if (text.includes('@집안일')) {
+        parsedCategory = 'household';
+        parsedTitle = parsedTitle.replace('@집안일', '').trim();
+      } else if (text.includes('@업무')) {
+        parsedCategory = 'work';
+        parsedTitle = parsedTitle.replace('@업무', '').trim();
+      } else if (text.includes('@쇼핑')) {
+        parsedCategory = 'shopping';
+        parsedTitle = parsedTitle.replace('@쇼핑', '').trim();
+      } else if (text.includes('@개인')) {
+        parsedCategory = 'personal';
+        parsedTitle = parsedTitle.replace('@개인', '').trim();
+      }
+
+      // Enhanced date extraction using patterns
+      Object.entries(DATE_PATTERNS).forEach(([dateType, pattern]) => {
+        if (pattern.test(text)) {
+          const today = new Date();
+          switch (dateType) {
+            case 'today':
+              parsedDueDate = today;
+              break;
+            case 'tomorrow':
+              parsedDueDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+              break;
+            case 'nextWeek':
+              parsedDueDate = new Date(
+                today.getTime() + 7 * 24 * 60 * 60 * 1000
+              );
+              break;
+            case 'afterDays': {
+              const match = text.match(/(\d+)일\s?후|in\s?(\d+)\s?days?/gi);
+              if (match) {
+                const days = parseInt(match[0].match(/\d+/)?.[0] || '1');
+                parsedDueDate = new Date(
+                  today.getTime() + days * 24 * 60 * 60 * 1000
+                );
+              }
+              break;
+            }
+          }
+          parsedTitle = parsedTitle.replace(pattern, '').trim();
+        }
+      });
+
+      // Legacy date parsing
+      if (text.includes('모레')) {
+        parsedDueDate = new Date();
+        parsedDueDate.setDate(parsedDueDate.getDate() + 2);
+        parsedTitle = parsedTitle.replace('모레', '').trim();
+      }
+
+      // Tags 파싱
+      const tagMatches = text.match(/#\S+/g);
+      if (tagMatches) {
+        tagMatches.forEach(tag => {
+          parsedTags.push(tag.substring(1));
+          parsedTitle = parsedTitle.replace(tag, '').trim();
+        });
+      }
+
+      // "까지" 제거
+      parsedTitle = parsedTitle.replace(/까지/g, '').trim();
+
+      return {
+        title: parsedTitle,
+        priority: parsedPriority,
+        category: parsedCategory,
+        tags: parsedTags,
+        dueDate: parsedDueDate,
+      };
+    },
+    [
+      enhancedParsing,
+      priority,
+      category,
+      dueDate,
+      tags,
+      taskType,
+      selectedGroupId,
+    ]
+  );
 
   // Real-time suggestions based on input
-  const generateSuggestions = (text: string) => {
-    if (!showSuggestions || text.length < 2) return [];
+  const generateSuggestions = useCallback(
+    (text: string) => {
+      if (!showSuggestions || text.length < 2) return [];
 
-    const suggestions: string[] = [];
+      const suggestions: string[] = [];
 
-    // Date suggestions
-    if (!text.includes('오늘') && !text.includes('내일')) {
-      suggestions.push(`${text} 오늘까지`);
-      suggestions.push(`${text} 내일까지`);
-    }
+      // Date suggestions
+      if (!text.includes('오늘') && !text.includes('내일')) {
+        suggestions.push(`${text} 오늘까지`);
+        suggestions.push(`${text} 내일까지`);
+      }
 
-    // Priority suggestions
-    if (
-      !text.includes('!') &&
-      !text.includes('긴급') &&
-      !text.includes('중요')
-    ) {
-      suggestions.push(`${text} !중요`);
-    }
+      // Priority suggestions
+      if (
+        !text.includes('!') &&
+        !text.includes('긴급') &&
+        !text.includes('중요')
+      ) {
+        suggestions.push(`${text} !중요`);
+      }
 
-    // Category suggestions
-    if (!text.includes('#') && !text.includes('@')) {
-      suggestions.push(`${text} @개인`);
-      suggestions.push(`${text} @업무`);
-    }
+      // Category suggestions
+      if (!text.includes('#') && !text.includes('@')) {
+        suggestions.push(`${text} @개인`);
+        suggestions.push(`${text} @업무`);
+      }
 
-    return suggestions.slice(0, 3);
-  };
+      return suggestions.slice(0, 3);
+    },
+    [showSuggestions]
+  );
 
   // Real-time parsing effect
   useEffect(() => {
@@ -265,14 +303,32 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
           setTags(prev => [...new Set([...prev, ...parsed.tags])]);
       }
     }
-  }, [input, enhancedParsing, showSuggestions, mode]);
+  }, [
+    input,
+    enhancedParsing,
+    showSuggestions,
+    mode,
+    parseNaturalLanguage,
+    generateSuggestions,
+    priority,
+    category,
+    dueDate,
+    tags,
+  ]);
+
+  // If task type is personal, ensure assignee defaults to current user
+  useEffect(() => {
+    if (taskType === 'personal') {
+      setAssigneeId(defaultAssigneeId || '');
+    }
+  }, [taskType, defaultAssigneeId]);
 
   const handleSubmit = async () => {
     if (!input.trim()) return;
 
     // 그룹 할일 선택 시 그룹이 선택되지 않은 경우 경고
     if (taskType === 'group' && !selectedGroupId) {
-      alert('그룹 할일을 선택하셨습니다. 그룹을 선택해주세요.');
+      toast.warning('그룹 할일을 선택하셨습니다. 그룹을 먼저 선택해주세요.');
       return;
     }
 
@@ -323,7 +379,7 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
       // Reset form
       resetForm();
     } catch (error) {
-      console.error('Failed to create task:', error);
+      logger.error('task', 'Failed to create task', error);
     } finally {
       setIsLoading(false);
     }
@@ -357,12 +413,36 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
     high: { label: '높음', icon: Flag },
   };
 
+  // TaskCreate와 유사한 스타일 맵
+  const priorityStyles: Record<
+    keyof typeof priorityConfig,
+    { gradient: string; border: string }
+  > = {
+    low: {
+      gradient: 'from-green-400 to-green-500',
+      border: 'border-green-400',
+    },
+    medium: {
+      gradient: 'from-yellow-400 to-yellow-500',
+      border: 'border-yellow-400',
+    },
+    high: { gradient: 'from-red-400 to-red-500', border: 'border-red-400' },
+  };
+
   const categoryConfig = {
     personal: { label: '개인', icon: User },
     work: { label: '업무', icon: Briefcase },
     household: { label: '집안일', icon: Home },
     shopping: { label: '쇼핑', icon: ShoppingCart },
     other: { label: '기타', icon: Settings },
+  };
+
+  const categoryStyles: Record<keyof typeof categoryConfig, string> = {
+    household: 'from-blue-400 to-blue-600',
+    shopping: 'from-green-400 to-green-600',
+    work: 'from-purple-400 to-purple-600',
+    personal: 'from-pink-400 to-pink-600',
+    other: 'from-gray-400 to-gray-600',
   };
 
   return (
@@ -391,8 +471,8 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
               placeholder={placeholder}
               className={cn(
                 'w-full px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 border-2 rounded-xl',
-                'bg-background/95 backdrop-blur-sm',
-                'text-foreground placeholder-muted-foreground',
+                'bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm',
+                'text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
                 'transition-all duration-200',
                 'focus:outline-none focus:ring-4 focus:ring-primary-400/30 focus:border-primary-400',
                 'group-hover:shadow-md',
@@ -404,6 +484,14 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                 fontWeight: 'var(--font-weight-medium)',
               }}
             />
+            {input && (
+              <span
+                className="ml-1 inline-block w-2 h-2 rounded-full bg-purple-400 animate-pulse"
+                aria-hidden="true"
+              />
+            )}
+            {/* 외부 스크롤 진입 시 자동 포커스 지원을 위한 식별자 */}
+            <div id="quick-add-input-anchor" className="sr-only" />
 
             {/* 5. 파싱된 정보 표시 컨테이너 */}
             {enhancedParsing && parsedData.cleanText && (
@@ -469,9 +557,7 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                 size="sm"
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="p-2 sm:p-2.5 lg:p-3 xl:p-4 backdrop-blur-sm bg-white/10 border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out group relative"
-                aria-label={
-                  isExpanded ? '간단 모드로 전환' : '고급 모드로 전환'
-                }
+                aria-label="+"
                 title={isExpanded ? '간단 모드로 전환' : '고급 옵션 보기'}
               >
                 <Lightbulb
@@ -481,11 +567,8 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                     isExpanded ? 'text-yellow-400' : 'text-white/60'
                   )}
                 />
-                {/* 툴팁 */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                  {isExpanded ? '간단 모드로 전환' : '고급 옵션 보기'}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80"></div>
-                </div>
+                <span className="sr-only">+</span>
+                {/* 툴팁 제거: 클릭 시 잔상(검은 영역) 발생 방지 */}
               </WaveButton>
             )}
 
@@ -528,35 +611,49 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
         {isExpanded && (
           <div className="mt-4 sm:mt-5 lg:mt-6 xl:mt-8 space-y-4 sm:space-y-5 lg:space-y-6 xl:space-y-8">
             {/* 13. 고급 옵션 그리드 컨테이너 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 xl:gap-8">
-              {/* 14. 우선순위 선택 컨테이너 */}
-              <div className="space-y-2 sm:space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6 xl:gap-8">
+              {/* 14. 우선순위 선택 컨테이너 (TaskCreate 스타일) */}
+              <div className="space-y-2 sm:space-y-3 order-1 sm:col-span-2 lg:col-span-3 xl:col-span-4">
                 {/* 15. 우선순위 라벨 텍스트 */}
                 <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium">
                   우선순위
                 </label>
-                {/* 16. 우선순위 버튼 그룹 컨테이너 */}
+                {/* 16. 우선순위 버튼 그룹 (TaskCreate 스타일 반영) */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
                   {Object.entries(priorityConfig).map(([key, config]) => (
                     <WaveButton
                       key={key}
-                      variant={priority === key ? 'primary' : 'ghost'}
+                      variant={'ghost'}
                       size="sm"
                       onClick={() => setPriority(key as TaskPriority)}
                       className={cn(
-                        'w-full px-2 sm:px-3 lg:px-4 xl:px-5 py-2 lg:py-2.5 xl:py-3 text-xs sm:text-sm lg:text-base xl:text-lg',
-                        'font-pretendard transition-all duration-300 ease-out',
-                        'backdrop-blur-sm bg-white/10 border border-white/20 shadow-lg hover:shadow-xl',
-                        'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
-                        'flex flex-col items-center justify-center gap-1 sm:gap-2',
-                        'text-center',
-                        priority === key
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white border-blue-400/50'
-                          : 'text-white/80 hover:text-white hover:bg-white/20'
+                        'w-full relative overflow-hidden transition-all duration-300 border-2',
+                        'px-2 sm:px-3 lg:px-4 xl:px-5 py-2 lg:py-2.5 xl:py-3 text-xs sm:text-sm lg:text-base xl:text-lg',
+                        'focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 outline-none',
+                        priority === key && 'shadow-md',
+                        priority === key &&
+                          (priorityStyles[key as keyof typeof priorityStyles]
+                            .border as string),
+                        priority !== key && 'bg-white/95 border-slate-300'
                       )}
+                      aria-label={`우선순위 ${config.label} 선택`}
                     >
-                      <config.icon className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 xl:h-6 xl:w-6 flex-shrink-0" />
-                      <span className="text-center truncate overflow-hidden w-full font-medium">
+                      <div
+                        className={cn(
+                          'absolute inset-0 opacity-15',
+                          priority === key &&
+                            (`bg-gradient-to-r ${
+                              priorityStyles[key as keyof typeof priorityStyles]
+                                .gradient
+                            }` as string)
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'relative z-10 font-semibold',
+                          priority === key ? 'text-white' : 'text-slate-800'
+                        )}
+                      >
                         {config.label}
                       </span>
                     </WaveButton>
@@ -564,14 +661,14 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                 </div>
               </div>
 
-              {/* 17. 카테고리 선택 컨테이너 */}
-              <div className="space-y-2 sm:space-y-3">
+              {/* 17. 카테고리 선택 컨테이너 (TaskCreate 스타일) */}
+              <div className="space-y-2 sm:space-y-3 order-2 sm:col-span-2 lg:col-span-3 xl:col-span-4">
                 {/* 18. 카테고리 라벨 텍스트 */}
                 <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium">
                   카테고리
                 </label>
-                {/* 19. 카테고리 버튼 그룹 컨테이너 */}
-                <div className="flex gap-2 sm:gap-3 w-full justify-between">
+                {/* 19. 카테고리 버튼 그룹 (TaskCreate 스타일 반영) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
                   {Object.entries(categoryConfig).map(([key, config]) => (
                     <WaveButton
                       key={key}
@@ -579,20 +676,40 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                       size="sm"
                       onClick={() => setCategory(key as TaskCategory)}
                       className={cn(
-                        'flex-1 px-2 sm:px-3 lg:px-4 xl:px-5 py-2 lg:py-2.5 xl:py-3 text-xs sm:text-sm lg:text-base xl:text-lg',
-                        'font-pretendard transition-all duration-300 ease-out',
-                        'backdrop-blur-sm bg-white/10 border border-white/20 shadow-lg hover:shadow-xl',
-                        'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
-                        'flex flex-col items-center justify-center gap-1 sm:gap-2',
-                        'text-center',
-                        'min-w-[60px] sm:min-w-[70px] lg:min-w-[80px] xl:min-w-[90px]',
+                        'relative flex flex-col items-center p-3 h-auto border-2 transition-all duration-300',
                         category === key
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white border-blue-400/50'
-                          : 'text-white/80 hover:text-white hover:bg-white/20'
+                          ? 'border-primary-400 bg-gradient-to-br from-primary-50 to-primary-100 shadow-lg'
+                          : 'border-slate-300 hover:border-slate-400 bg-white/95 backdrop-blur-sm hover:bg-white shadow-md'
                       )}
+                      aria-label={`카테고리 ${config.label} 선택`}
                     >
-                      <config.icon className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 xl:h-6 xl:w-6 flex-shrink-0" />
-                      <span className="text-center truncate overflow-hidden w-full font-medium">
+                      <div
+                        className={cn(
+                          'w-10 h-10 rounded-xl flex items-center justify-center mb-1 bg-gradient-to-br shadow-md transition-transform',
+                          category === key
+                            ? `${
+                                categoryStyles[
+                                  key as keyof typeof categoryStyles
+                                ]
+                              } scale-110`
+                            : 'from-slate-200 to-slate-300'
+                        )}
+                      >
+                        <config.icon
+                          className={cn(
+                            'w-4 h-4',
+                            category === key ? 'text-white' : 'text-slate-700'
+                          )}
+                        />
+                      </div>
+                      <span
+                        className={cn(
+                          'text-xs font-semibold',
+                          category === key
+                            ? 'text-primary-700'
+                            : 'text-slate-800'
+                        )}
+                      >
                         {config.label}
                       </span>
                     </WaveButton>
@@ -600,59 +717,163 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                 </div>
               </div>
 
-              {/* 20. 날짜 선택 컨테이너 */}
-              <div className="space-y-2 sm:space-y-3 xl:col-span-3 2xl:col-span-3">
-                {/* 21. 날짜 라벨 텍스트 */}
-                <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium">
-                  마감일
-                </label>
-                {/* 22. 날짜 선택 팝오버 */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <WaveButton
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        'w-full px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 border-2 rounded-xl',
-                        'bg-background/95 backdrop-blur-sm',
-                        'text-foreground placeholder-muted-foreground',
-                        'transition-all duration-200',
-                        'focus:outline-none focus:ring-4 focus:ring-primary-400/30 focus:border-primary-400',
-                        'group-hover:shadow-md',
-                        'font-pretendard text-sm sm:text-base lg:text-lg xl:text-xl',
-                        'justify-start text-left',
-                        'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
-                        'text-white/80 hover:text-white hover:bg-white/20'
-                      )}
+              {/* 20. 마감일/시간 선택 컨테이너 */}
+              <div className="mt-4 md:mt-5 lg:mt-0 order-3 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                  {/* 21. 마감일 섹션 */}
+                  <div className="space-y-2 sm:space-y-3">
+                    <label
+                      htmlFor="quickAddDueDate"
+                      className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium flex items-center gap-2"
                     >
-                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7 mr-2 sm:mr-3 flex-shrink-0" />
-                      <span className="text-xs sm:text-sm lg:text-base xl:text-lg font-pretendard truncate overflow-hidden">
-                        {dueDate
-                          ? format(dueDate, 'M월 d일', { locale: ko })
-                          : '날짜 선택'}
-                      </span>
-                    </WaveButton>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-auto p-0 glass-medium border-white/20"
-                    align="start"
-                  >
-                    <CalendarComponent
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={setDueDate}
-                      initialFocus
-                      className="font-pretendard"
-                    />
-                  </PopoverContent>
-                </Popover>
+                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                      마감일
+                    </label>
+                    {/* 22. 마감일 입력 (TaskCreate 스타일) */}
+                    <div className="group">
+                      <div className="relative">
+                        <div className="relative">
+                          <input
+                            type="date"
+                            id="quickAddDueDate"
+                            name="quickAddDueDate"
+                            value={dueDate ? format(dueDate, 'yyyy-MM-dd') : ''}
+                            onChange={e => {
+                              const value = e.target.value;
+                              if (!value) {
+                                setDueDate(undefined);
+                                return;
+                              }
+                              const next = new Date(value);
+                              if (dueTime) {
+                                const [h, m] = dueTime.split(':');
+                                next.setHours(
+                                  parseInt(h || '0'),
+                                  parseInt(m || '0')
+                                );
+                              }
+                              setDueDate(next);
+                            }}
+                            className={cn(
+                              'w-full px-4 lg:px-6 py-2.5 lg:py-3.5 pr-12',
+                              'border-2 border-gray-200/50 dark:border-gray-600/50 rounded-xl',
+                              'bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm',
+                              'text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
+                              'transition-all duration-300 ease-in-out',
+                              'focus:outline-none focus:ring-4 focus:ring-green-400/30 focus:border-green-400',
+                              'hover:border-green-300/70 dark:hover:border-green-400/70',
+                              'group-hover:shadow-lg group-hover:scale-[1.02]',
+                              'cursor-pointer'
+                            )}
+                            min={new Date().toISOString().split('T')[0]}
+                          />
+                          {dueDate && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                                <span className="text-white text-[10px] font-bold">
+                                  ✓
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {dueDate && (
+                          <div className="mt-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="h-3 w-3 text-green-600 dark:text-green-400" />
+                              <span className="text-green-700 dark:text-green-300 font-medium">
+                                {format(dueDate, 'yyyy년 M월 d일 EEEE', {
+                                  locale: ko,
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 시간 입력 (TaskCreate 스타일) */}
+                  <div className="space-y-2 sm:space-y-3">
+                    <label
+                      htmlFor="quickAddDueTime"
+                      className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium flex items-center gap-2"
+                    >
+                      <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                      시간
+                    </label>
+                    <div className="group">
+                      <div className="relative">
+                        <div className="relative">
+                          <input
+                            type="time"
+                            id="quickAddDueTime"
+                            name="quickAddDueTime"
+                            value={dueTime}
+                            onChange={e => {
+                              const value = e.target.value;
+                              setDueTime(value);
+                              if (!dueDate) return;
+                              if (!value) {
+                                const reset = new Date(dueDate);
+                                reset.setHours(0, 0, 0, 0);
+                                setDueDate(reset);
+                                return;
+                              }
+                              const [h, m] = value.split(':');
+                              const next = new Date(dueDate);
+                              next.setHours(
+                                parseInt(h || '0'),
+                                parseInt(m || '0'),
+                                0,
+                                0
+                              );
+                              setDueDate(next);
+                            }}
+                            className={cn(
+                              'w-full px-4 lg:px-6 py-2.5 lg:py-3.5 pr-12',
+                              'border-2 border-gray-200/50 dark:border-gray-600/50 rounded-xl',
+                              'bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm',
+                              'text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
+                              'transition-all duration-300 ease-in-out',
+                              'focus:outline-none focus:ring-4 focus:ring-blue-400/30 focus:border-blue-400',
+                              'hover:border-blue-300/70 dark:hover:border-blue-400/70',
+                              'group-hover:shadow-lg group-hover:scale-[1.02]',
+                              'cursor-pointer'
+                            )}
+                          />
+                          {dueTime && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                <span className="text-white text-[10px] font-bold">
+                                  ✓
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {dueTime && (
+                          <div className="mt-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                              <span className="text-blue-700 dark:text-blue-300 font-medium">
+                                {dueTime}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* 23. 담당자 선택 컨테이너 */}
-              {groupMembers.length > 0 && (
-                <div className="space-y-2 sm:space-y-3 xl:col-span-3 2xl:col-span-3">
+              {taskType === 'group' && uniqueGroupMembers.length > 0 && (
+                <div className="space-y-2 sm:space-y-3">
                   {/* 24. 담당자 라벨 텍스트 */}
-                  <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium">
+                  <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium flex items-center gap-2">
+                    <User className="h-4 w-4 sm:h-5 sm:w-5" />
                     담당자
                   </label>
                   {/* 25. 담당자 선택 팝오버 */}
@@ -663,30 +884,88 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                         size="sm"
                         className={cn(
                           'w-full px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 border-2 rounded-xl',
-                          'bg-background/95 backdrop-blur-sm',
-                          'text-foreground placeholder-muted-foreground',
-                          'transition-all duration-200',
-                          'focus:outline-none focus:ring-4 focus:ring-primary-400/30 focus:border-primary-400',
-                          'group-hover:shadow-md',
+                          'bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm',
+                          'text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
+                          'transition-all duration-300 ease-in-out',
+                          'focus:outline-none focus:ring-4 focus:ring-blue-400/30 focus:border-blue-400',
+                          'hover:border-blue-300/70 dark:hover:border-blue-400/70',
+                          'group-hover:shadow-lg group-hover:scale-[1.02]',
                           'font-pretendard text-sm sm:text-base lg:text-lg xl:text-xl',
                           'justify-start text-left',
                           'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
-                          'text-white/80 hover:text-white hover:bg-white/20'
+                          'relative overflow-hidden'
                         )}
                       >
-                        <User className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7 mr-2 sm:mr-3 flex-shrink-0" />
-                        <span className="text-xs sm:text-sm lg:text-base xl:text-lg font-pretendard truncate overflow-hidden">
-                          {groupMembers.find(m => m.id === assigneeId)?.name ||
-                            '담당자 선택'}
-                        </span>
+                        <div className="flex items-center gap-2 sm:gap-3 w-full">
+                          {assigneeId ? (
+                            <>
+                              <Avatar className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0">
+                                {uniqueGroupMembers.find(
+                                  m => m.id === assigneeId
+                                )?.avatar ? (
+                                  <AvatarImage
+                                    src={
+                                      uniqueGroupMembers.find(
+                                        m => m.id === assigneeId
+                                      )?.avatar
+                                    }
+                                    alt={
+                                      uniqueGroupMembers.find(
+                                        m => m.id === assigneeId
+                                      )?.name
+                                    }
+                                  />
+                                ) : null}
+                                <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                                  {uniqueGroupMembers
+                                    .find(m => m.id === assigneeId)
+                                    ?.name.split(' ')
+                                    .map(n => n[0])
+                                    .join('')
+                                    .toUpperCase()
+                                    .slice(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs sm:text-sm lg:text-base xl:text-lg font-pretendard truncate overflow-hidden text-gray-700 dark:text-gray-300">
+                                {
+                                  uniqueGroupMembers.find(
+                                    m => m.id === assigneeId
+                                  )?.name
+                                }
+                              </span>
+                              <div className="ml-auto flex-shrink-0">
+                                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                                  <span className="text-white text-xs sm:text-sm font-bold">
+                                    ✓
+                                  </span>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <User className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7 text-gray-600 dark:text-gray-400" />
+                              <span className="text-xs sm:text-sm lg:text-base xl:text-lg font-pretendard truncate overflow-hidden text-gray-700 dark:text-gray-300">
+                                담당자 선택
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </WaveButton>
                     </PopoverTrigger>
                     <PopoverContent
-                      className="w-48 p-2 glass-medium border-white/20"
+                      className="w-48 p-2 glass-medium border-white/20 shadow-2xl"
                       align="start"
                     >
+                      <div className="p-2 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-blue-200 dark:border-blue-800 mb-2">
+                        <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                          <User className="h-4 w-4" />
+                          <span className="text-sm font-medium">
+                            담당자 선택
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-1">
-                        {groupMembers.map(member => (
+                        {uniqueGroupMembers.map(member => (
                           <WaveButton
                             key={member.id}
                             variant="ghost"
@@ -694,10 +973,10 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                             onClick={() => setAssigneeId(member.id)}
                             className={cn(
                               'w-full justify-start font-pretendard',
-                              'px-3 py-2 text-sm',
+                              'px-3 py-2 text-sm transition-all duration-200',
                               assigneeId === member.id
-                                ? 'bg-white/20'
-                                : 'hover:bg-white/10'
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
                             )}
                           >
                             <Avatar className="h-6 w-6 mr-2">
@@ -729,7 +1008,8 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
             {/* 26. 태그 입력 컨테이너 */}
             <div className="space-y-2 sm:space-y-3">
               {/* 27. 태그 라벨 텍스트 */}
-              <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium">
+              <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium flex items-center gap-2">
+                <span className="text-purple-400">#</span>
                 태그
               </label>
               {/* 28. 태그 입력 필드 */}
@@ -746,14 +1026,15 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                       setCurrentTag('');
                     }
                   }}
-                  placeholder="태그 입력 후 Enter"
+                  placeholder="태그 입력..."
                   className={cn(
                     'w-full px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 border-2 rounded-xl',
-                    'bg-background/95 backdrop-blur-sm',
-                    'text-foreground placeholder-muted-foreground',
-                    'transition-all duration-200',
-                    'focus:outline-none focus:ring-4 focus:ring-primary-400/30 focus:border-primary-400',
-                    'group-hover:shadow-md',
+                    'bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm',
+                    'text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
+                    'transition-all duration-300 ease-in-out',
+                    'focus:outline-none focus:ring-4 focus:ring-purple-400/30 focus:border-purple-400',
+                    'hover:border-purple-300/70 dark:hover:border-purple-400/70',
+                    'group-hover:shadow-lg group-hover:scale-[1.02]',
                     'font-pretendard text-sm sm:text-base lg:text-lg xl:text-xl'
                   )}
                 />
@@ -765,22 +1046,18 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                     <Badge
                       key={index}
                       variant="secondary"
+                      onClick={() =>
+                        setTags(tags.filter((_, i) => i !== index))
+                      }
                       className={cn(
-                        'text-xs px-2 py-1',
-                        'backdrop-blur-sm bg-background/95 border-2 border-white/20',
+                        'text-xs px-3 py-1.5 cursor-pointer',
+                        'backdrop-blur-sm bg-purple-100/90 dark:bg-purple-900/30 border-2 border-purple-200 dark:border-purple-800',
                         'shadow-sm hover:shadow-md transition-all duration-200',
-                        'text-foreground font-pretendard'
+                        'text-purple-700 dark:text-purple-300 font-pretendard font-medium',
+                        'flex items-center gap-1'
                       )}
                     >
-                      #{tag}
-                      <button
-                        onClick={() =>
-                          setTags(tags.filter((_, i) => i !== index))
-                        }
-                        className="ml-1 hover:text-red-300 transition-colors"
-                      >
-                        ×
-                      </button>
+                      {tag} ×
                     </Badge>
                   ))}
                 </div>
@@ -790,7 +1067,8 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
             {/* 26-1. 할일유형 선택 컨테이너 */}
             <div className="space-y-2 sm:space-y-3">
               {/* 27-1. 할일유형 라벨 텍스트 */}
-              <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium">
+              <label className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/80 font-pretendard font-medium flex items-center gap-2">
+                <span className="text-orange-400">📋</span>
                 할일유형
               </label>
               {/* 28-1. 할일유형 선택 버튼 그룹 */}
@@ -808,7 +1086,7 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                     'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
                     'flex items-center justify-center gap-2',
                     taskType === 'personal'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white border-blue-400/50'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white border-blue-400/50 shadow-xl'
                       : 'text-white/80 hover:text-white hover:bg-white/20'
                   )}
                 >
@@ -830,7 +1108,7 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                     'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
                     'flex items-center justify-center gap-2',
                     taskType === 'group'
-                      ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-400/50'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white border-purple-400/50 shadow-xl'
                       : 'text-white/80 hover:text-white hover:bg-white/20',
                     groups.length === 0 && 'opacity-50 cursor-not-allowed'
                   )}
@@ -848,58 +1126,29 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
                     그룹 선택
                   </label>
                   {groups.length > 0 ? (
-                    /* 31-1. 그룹 선택 팝오버 */
-                    <Popover>
-                      <PopoverTrigger asChild>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                      {groups.map(group => (
                         <WaveButton
-                          variant="ghost"
+                          key={group.id}
+                          variant={'ghost'}
                           size="sm"
+                          onClick={() => setSelectedGroupId(group.id)}
                           className={cn(
-                            'w-full px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 border-2 rounded-xl',
-                            'bg-background/95 backdrop-blur-sm',
-                            'text-foreground placeholder-muted-foreground',
-                            'transition-all duration-200',
-                            'focus:outline-none focus:ring-4 focus:ring-primary-400/30 focus:border-primary-400',
-                            'group-hover:shadow-md',
-                            'font-pretendard text-sm sm:text-base lg:text-lg xl:text-xl',
-                            'justify-start text-left',
-                            'min-h-[40px] sm:min-h-[44px] lg:min-h-[48px] xl:min-h-[52px]',
-                            'text-white/80 hover:text-white hover:bg-white/20'
+                            'w-full justify-start font-pretendard transition-all duration-200',
+                            'px-3 py-2 border-2 rounded-xl backdrop-blur-sm',
+                            selectedGroupId === group.id
+                              ? 'border-blue-400 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                              : 'bg-white/95 text-slate-800 border-slate-300 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-600 hover:text-white hover:border-blue-400 shadow-md'
                           )}
+                          aria-label={`${group.name} 그룹 선택`}
                         >
-                          <Users className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7 mr-2 sm:mr-3 flex-shrink-0" />
-                          <span className="text-xs sm:text-sm lg:text-base xl:text-lg font-pretendard truncate overflow-hidden">
-                            {groups.find(g => g.id === selectedGroupId)?.name ||
-                              '그룹 선택'}
+                          <Users className="h-4 w-4 mr-2" />
+                          <span className="text-xs sm:text-sm lg:text-base xl:text-lg truncate">
+                            {group.name}
                           </span>
                         </WaveButton>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        className="w-48 p-2 glass-medium border-white/20"
-                        align="start"
-                      >
-                        <div className="space-y-1">
-                          {groups.map(group => (
-                            <WaveButton
-                              key={group.id}
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedGroupId(group.id)}
-                              className={cn(
-                                'w-full justify-start font-pretendard',
-                                'px-3 py-2 text-sm',
-                                selectedGroupId === group.id
-                                  ? 'bg-white/20'
-                                  : 'hover:bg-white/10'
-                              )}
-                            >
-                              <Users className="h-4 w-4 mr-2" />
-                              {group.name}
-                            </WaveButton>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                      ))}
+                    </div>
                   ) : (
                     /* 32-1. 그룹 없음 안내 메시지 */
                     <div className="p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl backdrop-blur-sm">
@@ -923,7 +1172,7 @@ const QuickAddTask: React.FC<QuickAddTaskProps> = ({
           <div className="mt-4 sm:mt-5 lg:mt-6 xl:mt-8">
             {/* 31. 제안 라벨 텍스트 */}
             <p className="text-sm sm:text-base lg:text-lg xl:text-xl text-white/60 font-pretendard mb-2 sm:mb-3">
-              제안:
+              팁: 제안
             </p>
             {/* 32. 제안 버튼 그룹 컨테이너 */}
             <div className="flex flex-wrap gap-2 sm:gap-3">

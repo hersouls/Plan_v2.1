@@ -1,4 +1,14 @@
 import '@testing-library/jest-dom';
+// fetch polyfill for Jest/node environment
+import fetch, { Headers, Request, Response } from 'cross-fetch';
+// @ts-ignore
+(global as any).fetch = fetch as any;
+// @ts-ignore
+(global as any).Headers = Headers as any;
+// @ts-ignore
+(global as any).Request = Request as any;
+// @ts-ignore
+(global as any).Response = Response as any;
 
 // Mock Firebase
 jest.mock('./lib/firebase', () => ({
@@ -66,27 +76,25 @@ jest.mock('react-router-dom', () => ({
   }),
 }));
 
-// Mock localStorage
-const localStorageMock = {
+// Mock localStorage & sessionStorage with defineProperty to ensure overridable spies
+const createStorageMock = () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
   length: 0,
   key: jest.fn(),
-};
-global.localStorage = localStorageMock as Storage;
+});
 
-// Mock sessionStorage
-const sessionStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-  length: 0,
-  key: jest.fn(),
-};
-global.sessionStorage = sessionStorageMock as Storage;
+Object.defineProperty(global, 'localStorage', {
+  value: createStorageMock(),
+  writable: true,
+});
+
+Object.defineProperty(global, 'sessionStorage', {
+  value: createStorageMock(),
+  writable: true,
+});
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -108,15 +116,18 @@ class MockIntersectionObserver {
   readonly root: Element | null = null;
   readonly rootMargin: string = '';
   readonly thresholds: ReadonlyArray<number> = [];
-  
+
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
-  takeRecords() { return []; }
+  takeRecords() {
+    return [];
+  }
 }
 
-global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+global.IntersectionObserver =
+  MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Mock ResizeObserver
 class MockResizeObserver {
@@ -128,12 +139,17 @@ class MockResizeObserver {
 
 global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
-// Mock Date for consistent testing
+// Mock Date for consistent testing (preserve Date.now semantics)
 const mockDate = new Date('2024-01-01T00:00:00.000Z');
-jest.spyOn(global, 'Date').mockImplementation(() => mockDate as any);
+beforeAll(() => {
+  jest.useFakeTimers().setSystemTime(mockDate);
+});
+afterAll(() => {
+  jest.useRealTimers();
+});
 
 // Mock TextEncoder and TextDecoder for Node.js environment
-import { TextEncoder, TextDecoder } from 'util';
+import { TextDecoder, TextEncoder } from 'util';
 
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as any;

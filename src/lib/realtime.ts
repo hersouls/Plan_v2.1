@@ -1,5 +1,14 @@
-import { onSnapshot, doc, collection, query, where, orderBy, Unsubscribe } from 'firebase/firestore';
+import {
+  Unsubscribe,
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from 'firebase/firestore';
 import { db } from './firebase';
+import logger from './logger';
 
 /**
  * Real-time synchronization service for Firebase data
@@ -26,7 +35,7 @@ export class RealtimeService {
     onError?: (error: Error) => void
   ): string {
     const subscriptionId = `user-${userId}`;
-    
+
     // Unsubscribe existing if any
     this.unsubscribe(subscriptionId);
 
@@ -34,7 +43,7 @@ export class RealtimeService {
       const userDocRef = doc(db, 'users', userId);
       const unsubscribe = onSnapshot(
         userDocRef,
-        (docSnapshot) => {
+        docSnapshot => {
           if (docSnapshot.exists()) {
             callback({
               id: docSnapshot.id,
@@ -44,10 +53,12 @@ export class RealtimeService {
             callback(null);
           }
         },
-        (error) => {
-          console.error('Error listening to user profile:', error);
+        error => {
+          logger.error('realtime', 'listen user profile failed', error);
           if (onError) {
-            onError(new Error('사용자 프로필 실시간 동기화 중 오류가 발생했습니다.'));
+            onError(
+              new Error('사용자 프로필 실시간 동기화 중 오류가 발생했습니다.')
+            );
           }
         }
       );
@@ -55,7 +66,7 @@ export class RealtimeService {
       this.subscriptions.set(subscriptionId, unsubscribe);
       return subscriptionId;
     } catch (error) {
-      console.error('Failed to subscribe to user profile:', error);
+      logger.error('realtime', 'subscribe user profile failed', error);
       if (onError) {
         onError(new Error('사용자 프로필 구독에 실패했습니다.'));
       }
@@ -72,7 +83,7 @@ export class RealtimeService {
     onError?: (error: Error) => void
   ): string {
     const subscriptionId = `groups-${userId}`;
-    
+
     // Unsubscribe existing if any
     this.unsubscribe(subscriptionId);
 
@@ -85,17 +96,19 @@ export class RealtimeService {
 
       const unsubscribe = onSnapshot(
         groupsQuery,
-        (querySnapshot) => {
+        querySnapshot => {
           const groups = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
           }));
           callback(groups);
         },
-        (error) => {
-          console.error('Error listening to user groups:', error);
+        error => {
+          logger.error('realtime', 'listen user groups failed', error);
           if (onError) {
-            onError(new Error('그룹 목록 실시간 동기화 중 오류가 발생했습니다.'));
+            onError(
+              new Error('그룹 목록 실시간 동기화 중 오류가 발생했습니다.')
+            );
           }
         }
       );
@@ -103,7 +116,7 @@ export class RealtimeService {
       this.subscriptions.set(subscriptionId, unsubscribe);
       return subscriptionId;
     } catch (error) {
-      console.error('Failed to subscribe to user groups:', error);
+      logger.error('realtime', 'subscribe user groups failed', error);
       if (onError) {
         onError(new Error('그룹 목록 구독에 실패했습니다.'));
       }
@@ -120,7 +133,7 @@ export class RealtimeService {
     onError?: (error: Error) => void
   ): string {
     const subscriptionId = `group-${groupId}`;
-    
+
     // Unsubscribe existing if any
     this.unsubscribe(subscriptionId);
 
@@ -128,7 +141,7 @@ export class RealtimeService {
       const groupDocRef = doc(db, 'groups', groupId);
       const unsubscribe = onSnapshot(
         groupDocRef,
-        (docSnapshot) => {
+        docSnapshot => {
           if (docSnapshot.exists()) {
             callback({
               id: docSnapshot.id,
@@ -138,10 +151,12 @@ export class RealtimeService {
             callback(null);
           }
         },
-        (error) => {
-          console.error('Error listening to group:', error);
+        error => {
+          logger.error('realtime', 'listen group failed', error);
           if (onError) {
-            onError(new Error('그룹 정보 실시간 동기화 중 오류가 발생했습니다.'));
+            onError(
+              new Error('그룹 정보 실시간 동기화 중 오류가 발생했습니다.')
+            );
           }
         }
       );
@@ -149,7 +164,7 @@ export class RealtimeService {
       this.subscriptions.set(subscriptionId, unsubscribe);
       return subscriptionId;
     } catch (error) {
-      console.error('Failed to subscribe to group:', error);
+      logger.error('realtime', 'subscribe group failed', error);
       if (onError) {
         onError(new Error('그룹 정보 구독에 실패했습니다.'));
       }
@@ -162,18 +177,18 @@ export class RealtimeService {
    */
   subscribeToUserTasks(
     userId: string,
-    groupId?: string,
     callback: (tasks: any[]) => void,
+    groupId?: string,
     onError?: (error: Error) => void
   ): string {
     const subscriptionId = `tasks-${userId}-${groupId || 'personal'}`;
-    
+
     // Unsubscribe existing if any
     this.unsubscribe(subscriptionId);
 
     try {
       let tasksQuery;
-      
+
       if (groupId) {
         // Group tasks
         tasksQuery = query(
@@ -193,17 +208,19 @@ export class RealtimeService {
 
       const unsubscribe = onSnapshot(
         tasksQuery,
-        (querySnapshot) => {
+        querySnapshot => {
           const tasks = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
           }));
           callback(tasks);
         },
-        (error) => {
-          console.error('Error listening to tasks:', error);
+        error => {
+          logger.error('realtime', 'listen tasks failed', error);
           if (onError) {
-            onError(new Error('할일 목록 실시간 동기화 중 오류가 발생했습니다.'));
+            onError(
+              new Error('할일 목록 실시간 동기화 중 오류가 발생했습니다.')
+            );
           }
         }
       );
@@ -211,7 +228,7 @@ export class RealtimeService {
       this.subscriptions.set(subscriptionId, unsubscribe);
       return subscriptionId;
     } catch (error) {
-      console.error('Failed to subscribe to tasks:', error);
+      logger.error('realtime', 'subscribe tasks failed', error);
       if (onError) {
         onError(new Error('할일 목록 구독에 실패했습니다.'));
       }
@@ -228,7 +245,7 @@ export class RealtimeService {
     onError?: (error: Error) => void
   ): string {
     const subscriptionId = `activities-${groupId}`;
-    
+
     // Unsubscribe existing if any
     this.unsubscribe(subscriptionId);
 
@@ -241,17 +258,19 @@ export class RealtimeService {
 
       const unsubscribe = onSnapshot(
         activitiesQuery,
-        (querySnapshot) => {
+        querySnapshot => {
           const activities = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
           }));
           callback(activities);
         },
-        (error) => {
-          console.error('Error listening to group activities:', error);
+        error => {
+          logger.error('realtime', 'listen activities failed', error);
           if (onError) {
-            onError(new Error('그룹 활동 실시간 동기화 중 오류가 발생했습니다.'));
+            onError(
+              new Error('그룹 활동 실시간 동기화 중 오류가 발생했습니다.')
+            );
           }
         }
       );
@@ -259,7 +278,7 @@ export class RealtimeService {
       this.subscriptions.set(subscriptionId, unsubscribe);
       return subscriptionId;
     } catch (error) {
-      console.error('Failed to subscribe to group activities:', error);
+      logger.error('realtime', 'subscribe activities failed', error);
       if (onError) {
         onError(new Error('그룹 활동 구독에 실패했습니다.'));
       }
@@ -276,7 +295,7 @@ export class RealtimeService {
     onError?: (error: Error) => void
   ): string {
     const subscriptionId = `settings-${userId}`;
-    
+
     // Unsubscribe existing if any
     this.unsubscribe(subscriptionId);
 
@@ -284,7 +303,7 @@ export class RealtimeService {
       const settingsDocRef = doc(db, 'userSettings', userId);
       const unsubscribe = onSnapshot(
         settingsDocRef,
-        (docSnapshot) => {
+        docSnapshot => {
           if (docSnapshot.exists()) {
             callback({
               id: docSnapshot.id,
@@ -295,10 +314,12 @@ export class RealtimeService {
             callback(null);
           }
         },
-        (error) => {
-          console.error('Error listening to user settings:', error);
+        error => {
+          logger.error('realtime', 'listen settings failed', error);
           if (onError) {
-            onError(new Error('사용자 설정 실시간 동기화 중 오류가 발생했습니다.'));
+            onError(
+              new Error('사용자 설정 실시간 동기화 중 오류가 발생했습니다.')
+            );
           }
         }
       );
@@ -306,7 +327,7 @@ export class RealtimeService {
       this.subscriptions.set(subscriptionId, unsubscribe);
       return subscriptionId;
     } catch (error) {
-      console.error('Failed to subscribe to user settings:', error);
+      logger.error('realtime', 'subscribe settings failed', error);
       if (onError) {
         onError(new Error('사용자 설정 구독에 실패했습니다.'));
       }
@@ -330,25 +351,50 @@ export class RealtimeService {
 
     subscriptions.forEach(sub => {
       let id: string = '';
-      
+
       switch (sub.type) {
         case 'user':
-          id = this.subscribeToUserProfile(sub.params.userId, sub.callback, sub.onError);
+          id = this.subscribeToUserProfile(
+            sub.params.userId,
+            sub.callback,
+            sub.onError
+          );
           break;
         case 'groups':
-          id = this.subscribeToUserGroups(sub.params.userId, sub.callback, sub.onError);
+          id = this.subscribeToUserGroups(
+            sub.params.userId,
+            sub.callback,
+            sub.onError
+          );
           break;
         case 'group':
-          id = this.subscribeToGroup(sub.params.groupId, sub.callback, sub.onError);
+          id = this.subscribeToGroup(
+            sub.params.groupId,
+            sub.callback,
+            sub.onError
+          );
           break;
         case 'tasks':
-          id = this.subscribeToUserTasks(sub.params.userId, sub.params.groupId, sub.callback, sub.onError);
+          id = this.subscribeToUserTasks(
+            sub.params.userId,
+            sub.callback,
+            sub.params.groupId,
+            sub.onError
+          );
           break;
         case 'activities':
-          id = this.subscribeToGroupActivities(sub.params.groupId, sub.callback, sub.onError);
+          id = this.subscribeToGroupActivities(
+            sub.params.groupId,
+            sub.callback,
+            sub.onError
+          );
           break;
         case 'settings':
-          id = this.subscribeToUserSettings(sub.params.userId, sub.callback, sub.onError);
+          id = this.subscribeToUserSettings(
+            sub.params.userId,
+            sub.callback,
+            sub.onError
+          );
           break;
       }
 
@@ -391,7 +437,7 @@ export class RealtimeService {
    */
   unsubscribeAll(): number {
     const count = this.subscriptions.size;
-    this.subscriptions.forEach((unsubscribe) => {
+    this.subscriptions.forEach(unsubscribe => {
       unsubscribe();
     });
     this.subscriptions.clear();

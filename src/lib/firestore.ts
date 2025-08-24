@@ -5,11 +5,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  documentId,
   getDoc,
   getDocs,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Unsubscribe,
@@ -27,6 +29,7 @@ import type {
   User,
 } from '../types';
 import { db } from './firebase';
+import logger from './logger';
 
 // 안전한 실시간 구독을 위한 헬퍼 함수 - 재시도 로직 포함
 function createSafeSnapshot<T>(
@@ -50,9 +53,9 @@ function createSafeSnapshot<T>(
             }
 
             // QuerySnapshot
-            const data = snapshot.docs.map((doc: any) => ({
+            const data = (snapshot.docs as any[]).map((doc: any) => ({
               id: doc.id,
-              ...doc.data(),
+              ...(doc.data() as any),
             })) as T;
             onNext(data);
           } else {
@@ -60,7 +63,7 @@ function createSafeSnapshot<T>(
             if (snapshot.exists()) {
               const data = {
                 id: snapshot.id,
-                ...snapshot.data(),
+                ...(snapshot.data() as any),
               } as T;
               onNext(data);
             } else {
@@ -68,20 +71,38 @@ function createSafeSnapshot<T>(
             }
           }
         } catch (error) {
-          console.error('Error processing snapshot data:', error);
+          logger.error('Error processing snapshot data:', error);
           if (onError) onError(error as Error);
         }
       },
       error: error => {
-        console.error('Firestore snapshot error:', error);
+        // 권한 오류나 400 오류는 조용히 처리
+        if (
+          error?.code === 'permission-denied' ||
+          error?.code === 'unauthenticated' ||
+          error?.message?.includes('permission') ||
+          error?.message?.includes('400') ||
+          error?.message?.includes('Bad Request')
+        ) {
+          logger.debug(
+            'Firestore snapshot permission/400 error, using empty data:',
+            error
+          );
+          // 빈 데이터로 콜백 호출
+          onNext([] as T);
+          return;
+        }
+
+        logger.error('Firestore snapshot error:', error);
 
         // 재시도 로직 - assertion 에러나 네트워크 에러의 경우
         if (
           retryCount < MAX_RETRIES &&
           (error.message.includes('INTERNAL ASSERTION FAILED') ||
-            error.message.includes('Unexpected state'))
+            error.message.includes('Unexpected state') ||
+            error.message.includes('network'))
         ) {
-          console.log(
+          logger.info(
             `Retrying snapshot connection... (${retryCount + 1}/${MAX_RETRIES})`
           );
 
@@ -89,7 +110,7 @@ function createSafeSnapshot<T>(
             try {
               createSafeSnapshot(queryOrDoc, onNext, onError, retryCount + 1);
             } catch (retryError) {
-              console.error('Retry failed:', retryError);
+              logger.error('Retry failed:', retryError);
               if (onError) onError(retryError as Error);
             }
           }, RETRY_DELAY * (retryCount + 1));
@@ -99,7 +120,7 @@ function createSafeSnapshot<T>(
       },
     });
   } catch (error) {
-    console.error('Error creating snapshot listener:', error);
+    logger.error('Error creating snapshot listener:', error);
     if (onError) onError(error as Error);
     // 빈 unsubscribe 함수 반환
     return () => {};
@@ -131,11 +152,11 @@ export const taskService = {
         )
       );
 
-      console.log('Final task data:', finalData); // 디버깅용 로그
+      logger.debug('taskService', 'final task data', finalData); // 디버깅용 로그
       const docRef = await addDoc(collection(db, 'tasks'), finalData);
       return docRef.id;
     } catch (error) {
-      console.error('Error creating task:', error);
+      logger.error('taskService', 'createTask failed', error);
       throw error;
     }
   },
@@ -151,7 +172,7 @@ export const taskService = {
       });
       await updateDoc(taskRef, sanitizedUpdates);
     } catch (error) {
-      console.error('Error updating task:', error);
+      logger.error('taskService', 'updateTask failed', error);
       throw error;
     }
   },
@@ -161,7 +182,7 @@ export const taskService = {
     try {
       await deleteDoc(doc(db, 'tasks', taskId));
     } catch (error) {
-      console.error('Error deleting task:', error);
+      logger.error('taskService', 'deleteTask failed', error);
       throw error;
     }
   },
@@ -175,8 +196,24 @@ export const taskService = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting task:', error);
+      logger.error('taskService', 'getTask failed', error);
       throw error;
+    }
+  },
+
+  // Subscribe to a single task document
+  subscribeToTask(
+    taskId: string,
+    callback: (task: Task | null) => void,
+    onError?: (error: Error) => void
+  ) {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      return createSafeSnapshot<Task | null>(taskRef, callback, onError);
+    } catch (error) {
+      logger.error('taskService', 'subscribeToTask failed', error);
+      if (onError) onError(error as Error);
+      return () => {};
     }
   },
 
@@ -195,7 +232,7 @@ export const taskService = {
 
       return createSafeSnapshot<Task[]>(q, callback, onError);
     } catch (error) {
-      console.error('Error subscribing to group tasks:', error);
+      logger.error('taskService', 'subscribeToGroupTasks failed', error);
       if (onError) onError(error as Error);
       return () => {};
     }
@@ -216,7 +253,7 @@ export const taskService = {
 
       return createSafeSnapshot<Task[]>(q, callback, onError);
     } catch (error) {
-      console.error('Error subscribing to user tasks:', error);
+      logger.error('taskService', 'subscribeToUserTasks failed', error);
       if (onError) onError(error as Error);
       return () => {};
     }
@@ -248,7 +285,7 @@ export const taskService = {
         onError
       );
     } catch (error) {
-      console.error('Error subscribing to personal tasks:', error);
+      logger.error('taskService', 'subscribeToPersonalTasks failed', error);
       if (onError) onError(error as Error);
       return () => {};
     }
@@ -269,7 +306,7 @@ export const taskService = {
         ...doc.data(),
       })) as Task[];
     } catch (error) {
-      console.error('Error getting group tasks:', error);
+      logger.error('taskService', 'getGroupTasks failed', error);
       throw error;
     }
   },
@@ -289,7 +326,7 @@ export const taskService = {
         ...doc.data(),
       })) as Task[];
     } catch (error) {
-      console.error('Error getting user tasks:', error);
+      logger.error('taskService', 'getUserTasks failed', error);
       throw error;
     }
   },
@@ -297,6 +334,57 @@ export const taskService = {
 
 // Group-related Firestore operations
 export const groupService = {
+  // Transfer group ownership atomically
+  async transferOwnership(
+    groupId: string,
+    newOwnerUserId: string,
+    requestingUserId: string
+  ): Promise<void> {
+    try {
+      await runTransaction(db, async tx => {
+        const groupRef = doc(db, 'groups', groupId);
+        const snap = await tx.get(groupRef);
+        if (!snap.exists()) {
+          throw new Error('Group not found');
+        }
+
+        const data: any = snap.data();
+        const currentOwner: string = data.ownerId;
+
+        if (currentOwner !== requestingUserId) {
+          throw new Error('Only the current owner can transfer ownership');
+        }
+
+        if (newOwnerUserId === currentOwner) {
+          throw new Error('New owner must be different from current owner');
+        }
+
+        const memberIds: string[] = Array.isArray(data.memberIds)
+          ? [...data.memberIds]
+          : [];
+        if (!memberIds.includes(newOwnerUserId)) {
+          memberIds.push(newOwnerUserId);
+        }
+
+        const memberRoles: Record<string, string> = {
+          ...(data.memberRoles || {}),
+        };
+        memberRoles[newOwnerUserId] = 'owner';
+        // Downgrade previous owner to admin for continuity
+        memberRoles[currentOwner] = 'admin';
+
+        tx.update(groupRef, {
+          ownerId: newOwnerUserId,
+          memberIds,
+          memberRoles,
+          updatedAt: serverTimestamp(),
+        });
+      });
+    } catch (error) {
+      logger.error('groupService', 'transferOwnership failed', error);
+      throw error;
+    }
+  },
   // Create a new group
   async createGroup(groupData: CreateGroupInput): Promise<string> {
     try {
@@ -309,7 +397,7 @@ export const groupService = {
       });
       return docRef.id;
     } catch (error) {
-      console.error('Error creating group:', error);
+      logger.error('groupService', 'createGroup failed', error);
       throw error;
     }
   },
@@ -323,7 +411,7 @@ export const groupService = {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Error updating group:', error);
+      logger.error('groupService', 'updateGroup failed', error);
       throw error;
     }
   },
@@ -344,7 +432,7 @@ export const groupService = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting group:', error);
+      logger.error('groupService', 'getGroup failed', error);
       throw error;
     }
   },
@@ -369,7 +457,7 @@ export const groupService = {
         onError
       );
     } catch (error) {
-      console.error('Error subscribing to group:', error);
+      logger.error('groupService', 'subscribeToGroup failed', error);
       if (onError) onError(error as Error);
       return () => {};
     }
@@ -389,7 +477,7 @@ export const groupService = {
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Error adding member to group:', error);
+      logger.error('groupService', 'addMemberToGroup failed', error);
       throw error;
     }
   },
@@ -398,6 +486,14 @@ export const groupService = {
   async removeMemberFromGroup(groupId: string, userId: string) {
     try {
       const groupRef = doc(db, 'groups', groupId);
+      const existing = await getDoc(groupRef);
+      if (!existing.exists()) {
+        throw new Error('Group not found');
+      }
+      const data: any = existing.data();
+      if (data.ownerId === userId) {
+        throw new Error('Cannot remove the group owner');
+      }
       const batch = writeBatch(db);
 
       // Remove from memberIds array
@@ -417,7 +513,7 @@ export const groupService = {
 
       await batch.commit();
     } catch (error) {
-      console.error('Error removing member from group:', error);
+      logger.error('groupService', 'removeMemberFromGroup failed', error);
       throw error;
     }
   },
@@ -437,7 +533,7 @@ export const groupService = {
         ...doc.data(),
       })) as FamilyGroup[];
     } catch (error) {
-      console.error('Error getting user groups:', error);
+      logger.error('groupService', 'getUserGroups failed', error);
       throw error;
     }
   },
@@ -457,7 +553,7 @@ export const groupService = {
 
       return createSafeSnapshot<FamilyGroup[]>(q, callback, onError);
     } catch (error) {
-      console.error('Error subscribing to user groups:', error);
+      logger.error('groupService', 'subscribeToUserGroups failed', error);
       if (onError) onError(error as Error);
       return () => {};
     }
@@ -474,53 +570,91 @@ export const groupService = {
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
       if (!groupDoc.exists()) {
         // 그룹이 존재하지 않는 경우 빈 배열 반환
-        console.warn(
-          `Group ${groupId} not found, returning empty members array`
-        );
+        logger.warn('groupService', 'group not found; empty members', groupId);
         return [];
       }
 
       const groupData = groupDoc.data();
-      const memberIds = groupData.memberIds || [];
+      const memberIds: string[] = groupData.memberIds || [];
       const memberRoles = groupData.memberRoles || {};
 
-      // Get user details for each member
-      const memberPromises = memberIds.map(async (memberId: string) => {
-        const userDoc = await getDoc(doc(db, 'users', memberId));
-        const userData = userDoc.exists() ? userDoc.data() : {};
+      if (memberIds.length === 0) return [];
 
-        // Handle role properly - extract string value if it's an object
-        let role = memberRoles[memberId] || 'member';
-        if (typeof role === 'object' && role !== null) {
-          // If role is stored as an object (e.g., {isDeputyGroupLeader: true}),
-          // convert it to appropriate string
-          if (role.isDeputyGroupLeader) {
-            role = 'admin'; // or 'deputyGroupLeader' if that's a valid role
-          } else {
-            role = 'member';
+      // Batch fetch users with documentId() in chunks of 10
+      const toChunks = (arr: string[], size: number) =>
+        Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+          arr.slice(i * size, i * size + size)
+        );
+
+      const chunks = toChunks(memberIds, 10);
+      const userMap = new Map<string, any>();
+      for (const chunk of chunks) {
+        try {
+          const q = query(
+            collection(db, 'users'),
+            where(documentId(), 'in', chunk)
+          );
+          const snap = await getDocs(q);
+          snap.docs.forEach(d => userMap.set(d.id, d.data()));
+        } catch (err) {
+          // Fallback per-user reads for this chunk
+          for (const memberId of chunk) {
+            try {
+              const uref = doc(db, 'users', memberId);
+              const usnap = await getDoc(uref);
+              if (usnap.exists()) userMap.set(memberId, usnap.data());
+            } catch (e) {
+              logger.warn(
+                'groupService',
+                `fallback users/${memberId} failed`,
+                e
+              );
+            }
           }
         }
+      }
+
+      // Build enriched member list preserving original order
+      return memberIds.map(memberId => {
+        const userData: any = userMap.get(memberId) || {};
+
+        let role = memberRoles[memberId] || 'member';
+        if (typeof role === 'object' && role !== null) {
+          role = (role as any).isDeputyGroupLeader ? 'admin' : 'member';
+        }
+
+        const resolvedName =
+          userData.displayName ||
+          userData.email ||
+          (userData.userName as string | undefined) ||
+          (userData.profile && (userData.profile.name as string | undefined)) ||
+          'Unknown User';
+
+        const resolvedAvatar =
+          userData.photoURL ||
+          (userData.avatarStorageUrl as string | undefined) ||
+          (userData.avatar as string | undefined) ||
+          (userData.profile &&
+            (userData.profile.avatar as string | undefined)) ||
+          null;
 
         return {
           userId: memberId,
-          displayName: userData.displayName || userData.email || 'Unknown User',
-          userName: userData.displayName || userData.email || 'Unknown User', // 호환성을 위해 유지
-          email: userData.email || '',
-          avatar: userData.photoURL || null,
-          role: role,
-          joinedAt: userData.createdAt || null,
-          isOnline: userData.isOnline || false,
-          // 기본값 설정 (실제 데이터는 getGroupStats에서 계산됨)
+          displayName: resolvedName,
+          userName: resolvedName,
+          email: (userData.email as string | undefined) || '',
+          avatar: resolvedAvatar,
+          role,
+          joinedAt: (userData.createdAt as any) || null,
+          isOnline: (userData.isOnline as boolean | undefined) || false,
           tasksCreated: 0,
           tasksAssigned: 0,
           tasksCompleted: 0,
-          points: userData.points || 0,
+          points: (userData.points as number | undefined) || 0,
         };
       });
-
-      return await Promise.all(memberPromises);
     } catch (error) {
-      console.error('Error getting group members:', error);
+      logger.error('groupService', 'getGroupMembers failed', error);
       throw error;
     }
   },
@@ -543,7 +677,7 @@ export const groupService = {
       // 먼저 그룹이 존재하는지 확인
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
       if (!groupDoc.exists()) {
-        console.warn(`Group ${groupId} not found, returning empty stats`);
+        logger.warn('groupService', 'group not found; empty stats', groupId);
         return {
           totalTasks: 0,
           completedTasks: 0,
@@ -621,7 +755,7 @@ export const groupService = {
         memberStats,
       };
     } catch (error) {
-      console.error('Error getting group stats:', error);
+      logger.error('groupService', 'getGroupStats failed', error);
       throw error;
     }
   },
@@ -657,7 +791,7 @@ export const groupService = {
 
       await batch.commit();
     } catch (error) {
-      console.error('Error deleting group:', error);
+      logger.error('groupService', 'deleteGroup failed', error);
       throw error;
     }
   },
@@ -680,7 +814,7 @@ export const groupService = {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       });
     } catch (error) {
-      console.error('Error inviting member by email:', error);
+      logger.error('groupService', 'inviteMemberByEmail failed', error);
       throw error;
     }
   },
@@ -693,12 +827,20 @@ export const groupService = {
   ): Promise<void> {
     try {
       const groupRef = doc(db, 'groups', groupId);
+      const groupSnap = await getDoc(groupRef);
+      if (!groupSnap.exists()) {
+        throw new Error('Group not found');
+      }
+      const data: any = groupSnap.data();
+      if (data.ownerId === userId && newRole !== 'owner') {
+        throw new Error('Cannot change role of the owner');
+      }
       await updateDoc(groupRef, {
         [`memberRoles.${userId}`]: newRole,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Error changing member role:', error);
+      logger.error('groupService', 'changeMemberRole failed', error);
       throw error;
     }
   },
@@ -719,7 +861,7 @@ export const groupService = {
 
       return code;
     } catch (error) {
-      console.error('Error generating invite code:', error);
+      logger.error('groupService', 'generateInviteCode failed', error);
       throw error;
     }
   },
@@ -750,12 +892,97 @@ export const groupService = {
         throw new Error('Invite code has expired');
       }
 
-      // Add user to group
-      await this.addMemberToGroup(groupId, userId, 'member');
+      // Enforce approval flow if required
+      const requireApproval = !!(
+        groupData.settings && groupData.settings.requireApprovalForNewMembers
+      );
 
-      return groupId;
+      if (requireApproval) {
+        await addDoc(collection(db, 'invitations'), {
+          groupId,
+          invitedBy: groupData.ownerId,
+          invitedUserId: userId,
+          role:
+            (groupData.settings && groupData.settings.defaultRole) || 'member',
+          status: 'pending_approval',
+          createdAt: serverTimestamp(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+        throw new Error('승인 대기 중입니다. 그룹 관리자의 승인이 필요합니다.');
+      } else {
+        // Add user to group immediately
+        await this.addMemberToGroup(groupId, userId, 'member');
+        return groupId;
+      }
     } catch (error) {
-      console.error('Error joining group by code:', error);
+      logger.error('groupService', 'joinGroupByCode failed', error);
+      throw error;
+    }
+  },
+
+  // Get pending invitations for a group
+  async getPendingInvitations(groupId: string): Promise<any[]> {
+    try {
+      const q = query(
+        collection(db, 'invitations'),
+        where('groupId', '==', groupId),
+        where('status', '==', 'pending_approval'),
+        orderBy('createdAt', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+    } catch (error) {
+      logger.error('groupService', 'getPendingInvitations failed', error);
+      throw error;
+    }
+  },
+
+  // Approve invitation
+  async approveInvitation(
+    invitationId: string,
+    groupId: string,
+    userId: string,
+    role: string
+  ): Promise<void> {
+    try {
+      const batch = writeBatch(db);
+
+      // Update invitation status
+      const invitationRef = doc(db, 'invitations', invitationId);
+      batch.update(invitationRef, {
+        status: 'approved',
+        approvedAt: serverTimestamp(),
+      });
+
+      // Add user to group
+      const groupRef = doc(db, 'groups', groupId);
+      batch.update(groupRef, {
+        memberIds: arrayUnion(userId),
+        [`memberRoles.${userId}`]: role,
+        updatedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+    } catch (error) {
+      logger.error('groupService', 'approveInvitation failed', error);
+      throw error;
+    }
+  },
+
+  // Reject invitation
+  async rejectInvitation(invitationId: string): Promise<void> {
+    try {
+      const invitationRef = doc(db, 'invitations', invitationId);
+      await updateDoc(invitationRef, {
+        status: 'rejected',
+        rejectedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      logger.error('groupService', 'rejectInvitation failed', error);
       throw error;
     }
   },
@@ -783,7 +1010,9 @@ export const commentService = {
 
       // attachments 배열 내부의 undefined 값 제거
       const cleanAttachments = Array.isArray(cleanData.attachments)
-        ? cleanData.attachments.filter(att => att !== undefined && att !== null)
+        ? cleanData.attachments.filter(
+            (att: unknown) => att !== undefined && att !== null
+          )
         : [];
 
       // attachments 배열 내부의 객체들도 검증
@@ -811,14 +1040,26 @@ export const commentService = {
         reactions: cleanData.reactions || {},
       };
 
-      console.log('Final Firestore data:', finalData);
-      console.log('Attachments detail:', finalData.attachments);
-      console.log('Validated attachments:', validatedAttachments);
+      logger.debug('commentService', 'final data', finalData);
+      logger.debug(
+        'commentService',
+        'attachments detail',
+        finalData.attachments
+      );
+      logger.debug(
+        'commentService',
+        'validated attachments',
+        validatedAttachments
+      );
 
       // undefined 값이 있는지 최종 확인 (재귀적 검사)
       const hasUndefined = checkForUndefined(finalData);
       if (hasUndefined) {
-        console.error('Undefined values found in final data:', finalData);
+        logger.error(
+          'commentService',
+          'undefined values in final data',
+          finalData
+        );
         throw new Error('데이터에 undefined 값이 포함되어 있습니다.');
       }
 
@@ -828,7 +1069,7 @@ export const commentService = {
       });
       return docRef.id;
     } catch (error) {
-      console.error('Error adding comment:', error);
+      logger.error('commentService', 'addComment failed', error);
       throw error;
     }
   },
@@ -838,7 +1079,7 @@ export const commentService = {
     try {
       await deleteDoc(doc(db, 'tasks', taskId, 'comments', commentId));
     } catch (error) {
-      console.error('Error deleting comment:', error);
+      logger.error('commentService', 'deleteComment failed', error);
       throw error;
     }
   },
@@ -857,7 +1098,7 @@ export const commentService = {
 
       return createSafeSnapshot<any[]>(q, callback, onError);
     } catch (error) {
-      console.error('Error subscribing to task comments:', error);
+      logger.error('commentService', 'subscribeToTaskComments failed', error);
       if (onError) onError(error as Error);
       return () => {};
     }
@@ -888,7 +1129,7 @@ export const commentService = {
         }
       }
     } catch (error) {
-      console.error('Error adding reaction:', error);
+      logger.error('commentService', 'addReaction failed', error);
       throw error;
     }
   },
@@ -914,7 +1155,7 @@ export const commentService = {
         });
       }
     } catch (error) {
-      console.error('Error adding file attachment:', error);
+      logger.error('commentService', 'addFileAttachment failed', error);
       throw error;
     }
   },
@@ -942,7 +1183,7 @@ export const commentService = {
         });
       }
     } catch (error) {
-      console.error('Error removing file attachment:', error);
+      logger.error('commentService', 'removeFileAttachment failed', error);
       throw error;
     }
   },
@@ -999,16 +1240,58 @@ export const userService = {
   ): Promise<void> {
     try {
       const userRef = doc(db, 'users', userId);
+
+      // 데이터 정규화: avatar -> photoURL 동기화
+      const normalizedData: Record<string, unknown> = { ...userData } as Record<
+        string,
+        unknown
+      >;
+      if ((normalizedData as any).avatar && !(normalizedData as any).photoURL) {
+        (normalizedData as any).photoURL = (normalizedData as any).avatar;
+        delete (normalizedData as any).avatar;
+      }
+
+      // undefined 제거 및 깊은 살균
+      const sanitizedData = filterUndefinedValues(normalizedData);
+
+      // 최종 검증: undefined가 남아있지 않은지 재귀 확인
+      const hasUndefined = checkForUndefined(sanitizedData);
+      if (hasUndefined) {
+        logger.warn(
+          'firestore',
+          'user profile contains undefined values after sanitation',
+          {
+            userId,
+            keys: Object.keys(sanitizedData || {}),
+          }
+        );
+      }
+
+      // 과도한 로그를 피하기 위해 키 목록만 출력
+      try {
+        logger.debug('firestore', 'upserting user profile', {
+          userId,
+          keys: Object.keys(sanitizedData || {}),
+        });
+      } catch {
+        /* noop */
+      }
+
       await setDoc(
         userRef,
         {
-          ...userData,
+          ...(sanitizedData as Record<string, unknown>),
           updatedAt: serverTimestamp(),
         },
         { merge: true }
       );
-    } catch (error) {
-      console.error('Error creating/updating user profile:', error);
+    } catch (error: any) {
+      logger.error('firestore', 'Error creating/updating user profile', {
+        code: error?.code,
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+      });
       throw error;
     }
   },
@@ -1022,7 +1305,7 @@ export const userService = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting user profile:', error);
+      logger.error('firestore', 'Error getting user profile', error);
       throw error;
     }
   },
@@ -1037,7 +1320,7 @@ export const userService = {
       const userRef = doc(db, 'users', userId);
       return createSafeSnapshot<User | null>(userRef, callback, onError);
     } catch (error) {
-      console.error('Error subscribing to user profile:', error);
+      logger.error('firestore', 'Error subscribing to user profile', error);
       if (onError) onError(error as Error);
       return () => {};
     }

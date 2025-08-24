@@ -1,15 +1,6 @@
 {
   "version": 2,
   "name": "moonwave-plan",
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
   "buildCommand": "npm run build:vercel",
   "routes": [
     {

@@ -1,32 +1,40 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { Task, TaskStatus, CreateTaskInput, UpdateTaskInput } from '../types/task';
+/* eslint-disable react-refresh/only-export-components */
+import logger from '@/lib/logger';
+import { Timestamp } from 'firebase/firestore';
+import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import { taskService } from '../lib/firestore';
-import { useAuth } from './AuthContext';
+import {
+  CreateTaskInput,
+  Task,
+  TaskStatus,
+  UpdateTaskInput,
+} from '../types/task';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 
 // Task State Interface
 export interface TaskState {
   // Tasks data
   tasks: Task[];
   filteredTasks: Task[];
-  
+
   // Current task details
   selectedTask: Task | null;
   selectedTaskId: string | null;
-  
+
   // Filters and sorting
   filters: TaskFilters;
   sortBy: TaskSortBy;
   sortOrder: 'asc' | 'desc';
-  
+
   // UI state
   viewMode: 'list' | 'grid' | 'calendar';
   showCompleted: boolean;
-  
+
   // Loading and error states
   loading: boolean;
   error: string | null;
-  
+
   // Statistics
   stats: TaskStats;
 }
@@ -44,7 +52,12 @@ export interface TaskFilters {
   tags?: string[];
 }
 
-export type TaskSortBy = 'dueDate' | 'priority' | 'createdAt' | 'title' | 'status';
+export type TaskSortBy =
+  | 'dueDate'
+  | 'priority'
+  | 'createdAt'
+  | 'title'
+  | 'status';
 
 export interface TaskStats {
   total: number;
@@ -63,10 +76,16 @@ export type TaskAction =
   | { type: 'ADD_TASK'; payload: Task }
   | { type: 'UPDATE_TASK'; payload: { id: string; updates: Partial<Task> } }
   | { type: 'REMOVE_TASK'; payload: string }
-  | { type: 'SET_SELECTED_TASK'; payload: { task: Task | null; taskId?: string | null } }
+  | {
+      type: 'SET_SELECTED_TASK';
+      payload: { task: Task | null; taskId?: string | null };
+    }
   | { type: 'SET_FILTERS'; payload: Partial<TaskFilters> }
   | { type: 'CLEAR_FILTERS' }
-  | { type: 'SET_SORT'; payload: { sortBy: TaskSortBy; sortOrder?: 'asc' | 'desc' } }
+  | {
+      type: 'SET_SORT';
+      payload: { sortBy: TaskSortBy; sortOrder?: 'asc' | 'desc' };
+    }
   | { type: 'SET_VIEW_MODE'; payload: 'list' | 'grid' | 'calendar' }
   | { type: 'TOGGLE_SHOW_COMPLETED' }
   | { type: 'SET_SHOW_COMPLETED'; payload: boolean }
@@ -113,25 +132,31 @@ const calculateStats = (tasks: Task[]): TaskStats => {
   const completed = tasks.filter(task => task.status === 'completed').length;
   const pending = tasks.filter(task => task.status === 'pending').length;
   const inProgress = tasks.filter(task => task.status === 'in_progress').length;
-  
-  const overdue = tasks.filter(task => 
-    task.dueDate && 
-    new Date(task.dueDate) < today && 
-    task.status !== 'completed'
-  ).length;
-  
+
+  const overdue = tasks.filter(task => {
+    if (!task.dueDate) return false;
+    const due = (task.dueDate as any)?.toDate
+      ? (task.dueDate as any).toDate()
+      : new Date(task.dueDate as any);
+    return due < today && task.status !== 'completed';
+  }).length;
+
   const dueToday = tasks.filter(task => {
     if (!task.dueDate) return false;
-    const dueDate = new Date(task.dueDate);
+    const dueDate = (task.dueDate as any)?.toDate
+      ? (task.dueDate as any).toDate()
+      : new Date(task.dueDate as any);
     return dueDate.toDateString() === today.toDateString();
   }).length;
-  
+
   const dueThisWeek = tasks.filter(task => {
     if (!task.dueDate) return false;
-    const dueDate = new Date(task.dueDate);
+    const dueDate = (task.dueDate as any)?.toDate
+      ? (task.dueDate as any).toDate()
+      : new Date(task.dueDate as any);
     return dueDate >= today && dueDate <= weekFromNow;
   }).length;
-  
+
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return {
@@ -163,22 +188,30 @@ const applyFiltersAndSort = (
 
   // Apply status filter
   if (filters.status && filters.status.length > 0) {
-    filteredTasks = filteredTasks.filter(task => filters.status!.includes(task.status));
+    filteredTasks = filteredTasks.filter(task =>
+      filters.status!.includes(task.status)
+    );
   }
 
   // Apply assignee filter
   if (filters.assigneeId && filters.assigneeId.length > 0) {
-    filteredTasks = filteredTasks.filter(task => filters.assigneeId!.includes(task.assigneeId));
+    filteredTasks = filteredTasks.filter(task =>
+      filters.assigneeId!.includes(task.assigneeId)
+    );
   }
 
   // Apply priority filter
   if (filters.priority && filters.priority.length > 0) {
-    filteredTasks = filteredTasks.filter(task => filters.priority!.includes(task.priority));
+    filteredTasks = filteredTasks.filter(task =>
+      filters.priority!.includes(task.priority)
+    );
   }
 
   // Apply category filter
   if (filters.category && filters.category.length > 0) {
-    filteredTasks = filteredTasks.filter(task => filters.category!.includes(task.category));
+    filteredTasks = filteredTasks.filter(task =>
+      filters.category!.includes(task.category)
+    );
   }
 
   // Apply date range filter
@@ -186,7 +219,9 @@ const applyFiltersAndSort = (
     const { start, end } = filters.dateRange;
     filteredTasks = filteredTasks.filter(task => {
       if (!task.dueDate) return false;
-      const dueDate = new Date(task.dueDate);
+      const dueDate = (task.dueDate as any)?.toDate
+        ? (task.dueDate as any).toDate()
+        : new Date(task.dueDate as any);
       return dueDate >= start && dueDate <= end;
     });
   }
@@ -194,10 +229,11 @@ const applyFiltersAndSort = (
   // Apply search query filter
   if (filters.searchQuery.trim()) {
     const query = filters.searchQuery.toLowerCase();
-    filteredTasks = filteredTasks.filter(task =>
-      task.title.toLowerCase().includes(query) ||
-      task.description?.toLowerCase().includes(query) ||
-      task.tags.some(tag => tag.toLowerCase().includes(query))
+    filteredTasks = filteredTasks.filter(
+      task =>
+        task.title.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query) ||
+        task.tags.some(tag => tag.toLowerCase().includes(query))
     );
   }
 
@@ -210,32 +246,54 @@ const applyFiltersAndSort = (
 
   // Apply sorting
   filteredTasks.sort((a, b) => {
-    let aValue: any;
-    let bValue: any;
+    let aValue: number | string = 0;
+    let bValue: number | string = 0;
 
     switch (sortBy) {
       case 'dueDate':
-        aValue = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-        bValue = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        aValue = a.dueDate
+          ? (a.dueDate as any)?.toDate
+            ? (a.dueDate as any).toDate().getTime()
+            : new Date(a.dueDate as any).getTime()
+          : Infinity;
+        bValue = b.dueDate
+          ? (b.dueDate as any)?.toDate
+            ? (b.dueDate as any).toDate().getTime()
+            : new Date(b.dueDate as any).getTime()
+          : Infinity;
         break;
-      case 'priority':
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
+      case 'priority': {
+        const priorityOrder: Record<string, number> = {
+          high: 3,
+          medium: 2,
+          low: 1,
+        };
         aValue = priorityOrder[a.priority] || 0;
         bValue = priorityOrder[b.priority] || 0;
         break;
+      }
       case 'createdAt':
-        aValue = new Date(a.createdAt).getTime();
-        bValue = new Date(b.createdAt).getTime();
+        aValue = (a.createdAt as any)?.toDate
+          ? (a.createdAt as any).toDate().getTime()
+          : new Date(a.createdAt as any).getTime();
+        bValue = (b.createdAt as any)?.toDate
+          ? (b.createdAt as any).toDate().getTime()
+          : new Date(b.createdAt as any).getTime();
         break;
       case 'title':
         aValue = a.title.toLowerCase();
         bValue = b.title.toLowerCase();
         break;
-      case 'status':
-        const statusOrder = { pending: 1, in_progress: 2, completed: 3 };
+      case 'status': {
+        const statusOrder: Record<string, number> = {
+          pending: 1,
+          in_progress: 2,
+          completed: 3,
+        };
         aValue = statusOrder[a.status] || 0;
         bValue = statusOrder[b.status] || 0;
         break;
+      }
       default:
         return 0;
     }
@@ -305,9 +363,10 @@ function taskReducer(state: TaskState, action: TaskAction): TaskState {
       const stats = calculateStats(tasks);
 
       // Update selected task if it was the one that changed
-      const selectedTask = state.selectedTask && state.selectedTask.id === action.payload.id
-        ? { ...state.selectedTask, ...action.payload.updates }
-        : state.selectedTask;
+      const selectedTask =
+        state.selectedTask && state.selectedTask.id === action.payload.id
+          ? { ...state.selectedTask, ...action.payload.updates }
+          : state.selectedTask;
 
       return {
         ...state,
@@ -330,12 +389,12 @@ function taskReducer(state: TaskState, action: TaskAction): TaskState {
       const stats = calculateStats(tasks);
 
       // Clear selected task if it was the one that was removed
-      const selectedTask = state.selectedTask && state.selectedTask.id === action.payload
-        ? null
-        : state.selectedTask;
-      const selectedTaskId = state.selectedTaskId === action.payload
-        ? null
-        : state.selectedTaskId;
+      const selectedTask =
+        state.selectedTask && state.selectedTask.id === action.payload
+          ? null
+          : state.selectedTask;
+      const selectedTaskId =
+        state.selectedTaskId === action.payload ? null : state.selectedTaskId;
 
       return {
         ...state,
@@ -351,7 +410,8 @@ function taskReducer(state: TaskState, action: TaskAction): TaskState {
       return {
         ...state,
         selectedTask: action.payload.task,
-        selectedTaskId: action.payload.taskId ?? action.payload.task?.id ?? null,
+        selectedTaskId:
+          action.payload.taskId ?? action.payload.task?.id ?? null,
       };
 
     case 'SET_FILTERS': {
@@ -481,26 +541,28 @@ function taskReducer(state: TaskState, action: TaskAction): TaskState {
 // Context Interface
 export interface TaskContextType {
   state: TaskState;
-  
+
   // Task operations
-  createTask: (data: Omit<CreateTaskInput, 'userId' | 'groupId'>) => Promise<void>;
+  createTask: (
+    data: Omit<CreateTaskInput, 'userId' | 'groupId'>
+  ) => Promise<void>;
   updateTask: (taskId: string, updates: UpdateTaskInput) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   toggleTaskStatus: (taskId: string) => Promise<void>;
-  
+
   // Task selection
   selectTask: (task: Task | null, taskId?: string) => void;
-  
+
   // Filtering and sorting
   setFilters: (filters: Partial<TaskFilters>) => void;
   clearFilters: () => void;
   setSort: (sortBy: TaskSortBy, sortOrder?: 'asc' | 'desc') => void;
-  
+
   // View options
   setViewMode: (mode: 'list' | 'grid' | 'calendar') => void;
   toggleShowCompleted: () => void;
   setShowCompleted: (show: boolean) => void;
-  
+
   // Utility functions
   getTodayTasks: () => Task[];
   getUpcomingTasks: (days?: number) => Task[];
@@ -525,7 +587,7 @@ export function useTask(): TaskContextType {
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(taskReducer, initialState);
   const { user } = useAuth();
-  const { state: appState, setLoading: setAppLoading, setError: setAppError } = useApp();
+  const { state: appState } = useApp();
 
   // Subscribe to tasks for current group
   useEffect(() => {
@@ -537,22 +599,30 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
-    const unsubscribe = taskService.subscribeToGroupTasks(appState.currentGroupId, (tasks) => {
-      try {
-        dispatch({ type: 'SET_TASKS', payload: tasks });
-        dispatch({ type: 'SET_LOADING', payload: false });
-      } catch (error) {
-        console.error('Error processing tasks:', error);
-        dispatch({ type: 'SET_ERROR', payload: '할일 목록을 처리하는 중 오류가 발생했습니다.' });
-        dispatch({ type: 'SET_LOADING', payload: false });
+    const unsubscribe = taskService.subscribeToGroupTasks(
+      appState.currentGroupId,
+      tasks => {
+        try {
+          dispatch({ type: 'SET_TASKS', payload: tasks });
+          dispatch({ type: 'SET_LOADING', payload: false });
+        } catch (error) {
+          logger.error('task', 'Error processing tasks', error);
+          dispatch({
+            type: 'SET_ERROR',
+            payload: '할일 목록을 처리하는 중 오류가 발생했습니다.',
+          });
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
       }
-    });
+    );
 
     return unsubscribe;
   }, [user, appState.currentGroupId]);
 
   // Task operations
-  const createTask = async (data: Omit<CreateTaskInput, 'userId' | 'groupId'>) => {
+  const createTask = async (
+    data: Omit<CreateTaskInput, 'userId' | 'groupId'>
+  ) => {
     if (!user || !appState.currentGroupId) {
       throw new Error('사용자 정보 또는 그룹 정보가 없습니다.');
     }
@@ -562,13 +632,16 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         ...data,
         userId: user.uid,
         groupId: appState.currentGroupId,
-        assigneeId: data.assigneeId || user.uid
+        assigneeId: data.assigneeId || user.uid,
       };
-      
+
       await taskService.createTask(fullTaskData);
     } catch (error) {
-      console.error('Error creating task:', error);
-      dispatch({ type: 'SET_ERROR', payload: '할일을 생성하는 중 오류가 발생했습니다.' });
+      logger.error('task', 'Error creating task', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: '할일을 생성하는 중 오류가 발생했습니다.',
+      });
       throw error;
     }
   };
@@ -577,8 +650,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     try {
       await taskService.updateTask(taskId, updates);
     } catch (error) {
-      console.error('Error updating task:', error);
-      dispatch({ type: 'SET_ERROR', payload: '할일을 업데이트하는 중 오류가 발생했습니다.' });
+      logger.error('task', 'Error updating task', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: '할일을 업데이트하는 중 오류가 발생했습니다.',
+      });
       throw error;
     }
   };
@@ -587,8 +663,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     try {
       await taskService.deleteTask(taskId);
     } catch (error) {
-      console.error('Error deleting task:', error);
-      dispatch({ type: 'SET_ERROR', payload: '할일을 삭제하는 중 오류가 발생했습니다.' });
+      logger.error('task', 'Error deleting task', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: '할일을 삭제하는 중 오류가 발생했습니다.',
+      });
       throw error;
     }
   };
@@ -597,24 +676,28 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const task = state.tasks.find(t => t.id === taskId);
     if (!task || !user) return;
 
-    const newStatus: TaskStatus = task.status === 'completed' ? 'pending' : 'completed';
+    const newStatus: TaskStatus =
+      task.status === 'completed' ? 'pending' : 'completed';
     const updates: UpdateTaskInput = {
       status: newStatus,
       ...(newStatus === 'completed' && {
-        completedAt: new Date(),
-        completedBy: user.uid
+        completedAt: Timestamp.now(),
+        completedBy: user.uid,
       }),
       ...(newStatus === 'pending' && {
         completedAt: undefined,
-        completedBy: undefined
-      })
+        completedBy: undefined,
+      }),
     };
 
     try {
       await updateTask(taskId, updates);
     } catch (error) {
-      console.error('Error toggling task status:', error);
-      dispatch({ type: 'SET_ERROR', payload: '할일 상태를 변경하는 중 오류가 발생했습니다.' });
+      logger.error('task', 'Error toggling task status', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: '할일 상태를 변경하는 중 오류가 발생했습니다.',
+      });
     }
   };
 
@@ -654,7 +737,13 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const today = new Date().toISOString().split('T')[0];
     return state.tasks.filter(task => {
       if (!task.dueDate) return false;
-      const taskDate = new Date(task.dueDate).toISOString().split('T')[0];
+      const taskDate = (
+        (task.dueDate as any)?.toDate
+          ? (task.dueDate as any).toDate()
+          : new Date(task.dueDate as any)
+      )
+        .toISOString()
+        .split('T')[0];
       return taskDate === today;
     });
   };
@@ -662,10 +751,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const getUpcomingTasks = (days: number = 7) => {
     const now = new Date();
     const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-    
+
     return state.tasks.filter(task => {
       if (!task.dueDate) return false;
-      const taskDate = new Date(task.dueDate);
+      const taskDate = (task.dueDate as any)?.toDate
+        ? (task.dueDate as any).toDate()
+        : new Date(task.dueDate as any);
       return taskDate > now && taskDate <= futureDate;
     });
   };
@@ -674,7 +765,10 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     const now = new Date();
     return state.tasks.filter(task => {
       if (!task.dueDate || task.status === 'completed') return false;
-      return new Date(task.dueDate) < now;
+      const d = (task.dueDate as any)?.toDate
+        ? (task.dueDate as any).toDate()
+        : new Date(task.dueDate as any);
+      return d < now;
     });
   };
 
@@ -689,33 +783,36 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true });
       // The subscription will automatically refresh the data
     } catch (error) {
-      console.error('Error refreshing tasks:', error);
-      dispatch({ type: 'SET_ERROR', payload: '할일 목록을 새로고침하는 중 오류가 발생했습니다.' });
+      logger.error('task', 'Error refreshing tasks', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: '할일 목록을 새로고침하는 중 오류가 발생했습니다.',
+      });
     }
   };
 
   const value: TaskContextType = {
     state,
-    
+
     // Task operations
     createTask,
     updateTask,
     deleteTask,
     toggleTaskStatus,
-    
+
     // Task selection
     selectTask,
-    
+
     // Filtering and sorting
     setFilters,
     clearFilters,
     setSort,
-    
+
     // View options
     setViewMode,
     toggleShowCompleted,
     setShowCompleted,
-    
+
     // Utility functions
     getTodayTasks,
     getUpcomingTasks,
@@ -724,11 +821,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     refreshTasks,
   };
 
-  return (
-    <TaskContext.Provider value={value}>
-      {children}
-    </TaskContext.Provider>
-  );
+  return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
 }
 
 export default TaskProvider;

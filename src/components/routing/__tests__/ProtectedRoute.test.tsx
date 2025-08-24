@@ -1,16 +1,30 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@testing-library/jest-dom';
-import { ProtectedRoute, withProtectedRoute } from '../ProtectedRoute';
+import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ProtectedRoute } from '../ProtectedRoute';
+import { withProtectedRoute } from '../withProtectedRoute';
 
 // Mock dependencies
 jest.mock('../../../contexts/AuthContext');
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  Navigate: ({ to, state, replace }: { to: string; state?: any; replace?: boolean }) => (
-    <div data-testid="navigate" data-to={to} data-state={JSON.stringify(state)} data-replace={replace}>
+  Navigate: ({
+    to,
+    state,
+    replace,
+  }: {
+    to: string;
+    state?: any;
+    replace?: boolean;
+  }) => (
+    <div
+      data-testid="navigate"
+      data-to={to}
+      data-state={JSON.stringify(state)}
+      data-replace={replace}
+    >
       Navigate to {to}
     </div>
   ),
@@ -36,9 +50,7 @@ const renderWithRouter = (
   initialEntries: string[] = ['/']
 ) => {
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      {component}
-    </MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>{component}</MemoryRouter>
   );
 };
 
@@ -97,11 +109,11 @@ describe('ProtectedRoute', () => {
       expect(navigate).toBeInTheDocument();
       expect(navigate).toHaveAttribute('data-to', '/login');
       expect(navigate).toHaveAttribute('data-replace', 'true');
-      
+
       // 현재 위치가 state에 저장되는지 확인
       const state = JSON.parse(navigate.getAttribute('data-state') || '{}');
       expect(state.from.pathname).toBe('/protected-page');
-      
+
       expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
     });
 
@@ -205,7 +217,7 @@ describe('ProtectedRoute', () => {
       expect(navigate).toBeInTheDocument();
       expect(navigate).toHaveAttribute('data-to', '/');
       expect(navigate).toHaveAttribute('data-replace', 'true');
-      
+
       expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
     });
 
@@ -295,7 +307,7 @@ describe('ProtectedRoute', () => {
       });
 
       const CustomProtectedComponent = withProtectedRoute(TestComponent, {
-        requireAuth: false
+        requireAuth: false,
       });
 
       renderWithRouter(<CustomProtectedComponent />);
@@ -328,9 +340,7 @@ describe('ProtectedRoute', () => {
 
       const ProtectedPropsComponent = withProtectedRoute(PropsTestComponent);
 
-      renderWithRouter(
-        <ProtectedPropsComponent testProp="test value" />
-      );
+      renderWithRouter(<ProtectedPropsComponent testProp="test value" />);
 
       expect(screen.getByText('test value')).toBeInTheDocument();
     });
@@ -359,9 +369,11 @@ describe('ProtectedRoute', () => {
 
       // LoadingSpinner가 올바른 props로 렌더링되는지 확인
       expect(screen.getByText('인증 확인 중...')).toBeInTheDocument();
-      
+
       // 백그라운드와 함께 렌더링되는지 확인
-      const loadingContainer = screen.getByText('인증 확인 중...').closest('div');
+      const loadingContainer = screen
+        .getByText('인증 확인 중...')
+        .closest('div');
       expect(loadingContainer).toHaveClass('min-h-screen');
     });
   });
