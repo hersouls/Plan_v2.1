@@ -88,7 +88,6 @@ export class NotificationFilterUtils {
         }
 
         case 'priority': {
-          const priorityOrder = { high: 3, medium: 2, low: 1 } as const;
           comparison = priorityOrder[a.priority] - priorityOrder[b.priority];
           break;
         }
