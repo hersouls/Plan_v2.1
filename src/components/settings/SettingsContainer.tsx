@@ -6,7 +6,7 @@ import { GlassCard } from '../ui/GlassCard';
 import { WaveButton } from '../ui/WaveButton';
 import { Typography } from '../ui/typography';
 import { SettingsContent, SettingsNavigation } from './components';
-import { useSettingsContext } from './contexts/SettingsContext';
+import { useSettingsContext } from './contexts/SettingsContextBase';
 import { useSettingsTab } from './hooks/useSettingsTab';
 import type { SettingsContainerProps } from './types';
 

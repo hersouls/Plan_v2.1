@@ -23,7 +23,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { useSettingsContext } from '../components/settings/contexts/SettingsContext';
+import { useSettingsContext } from '../components/settings/contexts/SettingsContextBase';
 import { AttachmentSection } from '../components/task/FileAttachment';
 import type { FormData as TaskFormData } from '../components/task/form/taskForm.types';
 import { useTaskValidation } from '../components/task/form/useTaskValidation';

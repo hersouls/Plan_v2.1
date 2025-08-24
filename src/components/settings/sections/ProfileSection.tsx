@@ -18,8 +18,10 @@ import { InlineLoading } from '../../common/LoadingSpinner';
 import { GlassCard } from '../../ui/GlassCard';
 import { WaveButton } from '../../ui/WaveButton';
 import { SettingsGroup } from '../components';
-import { useSettingsContext } from '../contexts/SettingsContext';
+import { useSettingsContext } from '../contexts/SettingsContextBase';
 import type { SettingsSectionProps } from '../types';
+import type { UserProfile } from '../types';
+import logger from '../../../lib/logger';
 
 export function ProfileSection({
   isActive,
@@ -33,13 +35,13 @@ export function ProfileSection({
 
   // 단순한 상태 관리 - useEffect 없이
   const [isEditing, setIsEditing] = useState(false);
-  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<keyof UserProfile | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // editData는 항상 현재 settings.profile을 사용하거나 편집 중일 때만 로컬 상태 사용
-  const [localEditData, setLocalEditData] = useState<any>(null);
+  const [localEditData, setLocalEditData] = useState<Partial<UserProfile> | null>(null);
   const editData = useMemo(
     () => (isEditing && localEditData ? localEditData : settings.profile),
     [isEditing, localEditData, settings.profile]
@@ -60,13 +62,17 @@ export function ProfileSection({
 
   // 미완료 필드 목록
   const incompleteFields = useMemo(() => {
-    const fields = [
+    const fields: Array<{
+      key: keyof UserProfile;
+      label: string;
+      icon: React.ComponentType<{ size?: number | string; className?: string }>;
+    }> = [
       { key: 'displayName', label: '이름', icon: User },
       { key: 'phone', label: '전화번호', icon: Phone },
       { key: 'location', label: '위치', icon: MapPin },
       { key: 'bio', label: '자기소개', icon: Globe },
     ];
-    return fields.filter(field => !(settings.profile as any)[field.key]);
+    return fields.filter(field => !settings.profile[field.key]);
   }, [settings.profile]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,7 +123,7 @@ export function ProfileSection({
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Failed to upload avatar', error);
+      logger.error('profile', 'Failed to upload avatar', error);
       alert(
         error instanceof Error ? error.message : '아바타 업로드에 실패했습니다.'
       );
@@ -140,7 +146,7 @@ export function ProfileSection({
     setIsEditing(!isEditing);
   };
 
-  const handleFieldEdit = (fieldKey: string) => {
+  const handleFieldEdit = (fieldKey: keyof UserProfile) => {
     if (!isEditing) {
       // 편집 모드가 아니면 먼저 편집 모드로 전환
       setLocalEditData({ ...settings.profile });
@@ -149,7 +155,7 @@ export function ProfileSection({
     setEditingField(fieldKey);
   };
 
-  const handleFieldSave = async (fieldKey: string) => {
+  const handleFieldSave = async (fieldKey: keyof UserProfile) => {
     if (!localEditData) return;
 
     try {
@@ -176,7 +182,7 @@ export function ProfileSection({
       setEditingField(null);
       setFormErrors({});
     } catch (error) {
-      console.error('Failed to save field', error);
+      logger.error('profile', 'Failed to save field', error);
       alert('저장에 실패했습니다.');
     }
   };
@@ -209,7 +215,7 @@ export function ProfileSection({
       setIsEditing(false);
       setEditingField(null);
     } catch (error) {
-      console.error('Failed to save profile', error);
+      logger.error('profile', 'Failed to save profile', error);
       alert('프로필 저장에 실패했습니다.');
     }
   };
@@ -225,8 +231,8 @@ export function ProfileSection({
     return name.substring(0, 2).toUpperCase();
   };
 
-  const renderField = (
-    fieldKey: string,
+  const renderField = <K extends keyof UserProfile & string>(
+    fieldKey: K,
     label: string,
     icon: React.ComponentType<{ size?: number | string; className?: string }>,
     placeholder: string,
@@ -234,8 +240,8 @@ export function ProfileSection({
   ) => {
     const isFieldEditing = editingField === fieldKey;
     const value = isFieldEditing
-      ? (editData as any)[fieldKey] || ''
-      : (settings.profile as any)[fieldKey] || '';
+      ? (editData?.[fieldKey] as string) || ''
+      : (settings.profile[fieldKey] as string) || '';
     const hasError = formErrors[fieldKey];
     const IconComponent = icon;
 
@@ -263,8 +269,8 @@ export function ProfileSection({
               <textarea
                 value={value}
                 onChange={e =>
-                  setLocalEditData((prev: any) => ({
-                    ...prev,
+                  setLocalEditData(prev => ({
+                    ...(prev ?? {}),
                     [fieldKey]: e.target.value,
                   }))
                 }
@@ -282,8 +288,8 @@ export function ProfileSection({
                 type={type}
                 value={value}
                 onChange={e =>
-                  setLocalEditData((prev: typeof settings.profile | null) => ({
-                    ...prev,
+                  setLocalEditData(prev => ({
+                    ...(prev ?? {}),
                     [fieldKey]: e.target.value,
                   }))
                 }
@@ -492,7 +498,7 @@ export function ProfileSection({
                               try {
                                 await deleteAvatar();
                               } catch (error) {
-                                console.error('Failed to delete avatar', error);
+                                logger.error('profile', 'Failed to delete avatar', error);
                                 alert('사진 삭제에 실패했습니다.');
                               }
                             }

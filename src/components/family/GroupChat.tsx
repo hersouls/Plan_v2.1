@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useChat } from '../../hooks/useChat';
 import { cn, logger } from '../../lib/utils';
 import type { ChatMessage, ChatSearchResult } from '../../types/chat';
-import { useSettingsContext } from '../settings/contexts/SettingsContext';
+import { useSettingsContext } from '../settings/contexts/SettingsContextBase';
 import { GlassCard } from '../ui/GlassCard';
 import { WaveButton } from '../ui/WaveButton';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
