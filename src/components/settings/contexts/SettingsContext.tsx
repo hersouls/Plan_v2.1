@@ -177,10 +177,6 @@ function settingsReducer(
     default:
       return state;
   }
-}
-
-// Context and hook moved to SettingsContextBase to satisfy react-refresh rule
-
 interface SettingsProviderProps {
   children: React.ReactNode;
 }

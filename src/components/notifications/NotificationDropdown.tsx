@@ -156,7 +156,14 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = React.m
     const formatTime = (timestamp: Date | string | { toDate: () => Date } | null) => {
       if (!timestamp) return '';
       
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      let date: Date;
+      if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'object' && 'toDate' in timestamp && typeof (timestamp as { toDate: unknown }).toDate === 'function') {
+        date = (timestamp as { toDate: () => Date }).toDate();
+      } else {
+        date = new Date(timestamp as string);
+      }
       const now = new Date();
       const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
       
@@ -189,23 +196,22 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = React.m
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-gray-600" />
             <Typography.H4 className="text-gray-900">알림</Typography.H4>
-            {stats?.unread > 0 && (
+            {stats && (stats.unread ?? 0) > 0 && (
               <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
                 {stats.unread}
               </span>
             )}
           </div>
           <div className="flex items-center gap-1">
-            {stats?.unread > 0 && (
+            {stats && (stats.unread ?? 0) > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
                 disabled={isMarkingAll}
                 className={cn(
                   'p-1 rounded-lg transition-colors',
                   'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                  isMarkingAll && 'opacity-50 cursor-not-allowed'
                 )}
-                title="모든 알림 읽음 처리"
               >
                 {isMarkingAll ? (
                   <LoadingSpinner size="sm" />
