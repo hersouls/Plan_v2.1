@@ -11,16 +11,6 @@
 
     <!-- 폰트 로딩은 styles/globals.css의 Pretendard Variable @import에서 단일 관리 -->
 
-    <!-- 3) Vite 클라이언트 + React Refresh preamble (순서 매우 중요) -->
-    <script type="module" src="/@vite/client"></script>
-    <script type="module">
-      import RefreshRuntime from '/@react-refresh';
-      RefreshRuntime.injectIntoGlobalHook(window);
-      window.$RefreshReg$ = () => {};
-      window.$RefreshSig$ = () => (type) => type;
-      window.__vite_plugin_react_preamble_installed__ = true;
-    </script>
-
     <!-- PWA Meta Tags -->
     <meta name="description" content="가족과 함께하는 스마트한 할일 관리 앱" />
     <meta name="theme-color" content="#3b82f6" />
