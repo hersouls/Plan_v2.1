@@ -1,13 +1,13 @@
 import '@testing-library/jest-dom';
 // fetch polyfill for Jest/node environment
 import fetch, { Headers, Request, Response } from 'cross-fetch';
-// @ts-ignore
+// @ts-expect-error - global assignment for test environment
 (global as any).fetch = fetch as any;
-// @ts-ignore
+// @ts-expect-error - global assignment for test environment
 (global as any).Headers = Headers as any;
-// @ts-ignore
+// @ts-expect-error - global assignment for test environment
 (global as any).Request = Request as any;
-// @ts-ignore
+// @ts-expect-error - global assignment for test environment
 (global as any).Response = Response as any;
 
 // Mock Firebase

@@ -80,16 +80,18 @@ export class NotificationFilterUtils {
       let comparison = 0;
 
       switch (sortBy) {
-        case 'createdAt':
+        case 'createdAt': {
           const dateA = this.getNotificationDate(a.createdAt);
           const dateB = this.getNotificationDate(b.createdAt);
           comparison = dateA.getTime() - dateB.getTime();
           break;
+        }
 
-        case 'priority':
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
+        case 'priority': {
+          const priorityOrder = { high: 3, medium: 2, low: 1 } as const;
           comparison = priorityOrder[a.priority] - priorityOrder[b.priority];
           break;
+        }
 
         case 'type':
           comparison = a.type.localeCompare(b.type);
@@ -117,7 +119,7 @@ export class NotificationFilterUtils {
       let label = '';
 
       switch (groupBy) {
-        case 'date':
+        case 'date': {
           const date = this.getNotificationDate(notification.createdAt);
           const now = new Date();
           const diffTime = Math.abs(now.getTime() - date.getTime());
@@ -140,6 +142,7 @@ export class NotificationFilterUtils {
             label = '이전';
           }
           break;
+        }
 
         case 'type':
           key = notification.type;

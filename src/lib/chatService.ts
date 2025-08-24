@@ -327,7 +327,7 @@ export class ChatService {
     groupId: string,
     messageId: string,
     userId: string,
-    userName: string
+    _userName: string
   ): Promise<void> {
     try {
       const messageRef = doc(db, 'groups', groupId, 'chat', messageId);

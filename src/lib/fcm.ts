@@ -6,7 +6,7 @@ import logger from './logger';
 const VAPID_KEY = (() => {
   try {
     // Prefer Vite's injected env at build time
-    // @ts-ignore - import.meta is available in Vite/browser
+    // @ts-expect-error - import.meta is available in Vite/browser
     const viteEnv =
       typeof import.meta !== 'undefined' ? import.meta.env : undefined;
     if (viteEnv?.VITE_FCM_VAPID_KEY)
@@ -15,9 +15,7 @@ const VAPID_KEY = (() => {
     /* noop */
   }
   // Fallback for Node/Jest where process is defined
-  // eslint-disable-next-line no-undef
   if (typeof process !== 'undefined' && process.env?.VITE_FCM_VAPID_KEY) {
-    // eslint-disable-next-line no-undef
     return process.env.VITE_FCM_VAPID_KEY as string;
   }
   return undefined;

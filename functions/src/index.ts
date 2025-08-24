@@ -158,7 +158,7 @@ export const onCommentDeleted = onDocumentDeleted(
 );
 
 // Scheduled function to send daily reminders
-export const sendDailyReminders = onSchedule('0 9 * * *', async event => {
+export const sendDailyReminders = onSchedule('0 9 * * *', async (_event) => {
   console.log('Running daily reminders...');
 
   try {
@@ -172,7 +172,7 @@ export const sendDailyReminders = onSchedule('0 9 * * *', async event => {
       .where('dueDate', '<=', admin.firestore.Timestamp.fromDate(today))
       .get();
 
-    const reminderPromises: Promise<any>[] = [];
+    const reminderPromises: Promise<void>[] = [];
 
     tasksQuery.forEach(doc => {
       const taskData = doc.data();
@@ -189,7 +189,7 @@ export const sendDailyReminders = onSchedule('0 9 * * *', async event => {
 });
 
 // Scheduled function to send weekly summaries
-export const sendWeeklySummary = onSchedule('0 18 * * 0', async event => {
+export const sendWeeklySummary = onSchedule('0 18 * * 0', async (_event) => {
   console.log('Running weekly summary...');
 
   try {
@@ -206,9 +206,16 @@ export const sendWeeklySummary = onSchedule('0 18 * * 0', async event => {
 });
 
 // Helper function to send task assignment notification
+interface TaskData {
+  userId: string;
+  assigneeId: string;
+  title: string;
+  [key: string]: any;
+}
+
 async function sendTaskAssignmentNotification(
   userId: string,
-  taskData: any,
+  taskData: TaskData,
   taskId: string
 ) {
   try {
@@ -267,7 +274,7 @@ async function sendTaskAssignmentNotification(
 // Helper function to send task reminder notification
 async function sendTaskReminderNotification(
   userId: string,
-  taskData: any,
+  taskData: TaskData,
   taskId: string
 ) {
   try {
@@ -329,7 +336,7 @@ async function sendTaskReminderNotification(
 }
 
 // Helper function to handle task completion
-async function handleTaskCompletion(taskId: string, taskData: any) {
+async function handleTaskCompletion(taskId: string, taskData: TaskData) {
   try {
     // Update user statistics
     await updateUserStats(taskData.completedBy);
@@ -354,7 +361,7 @@ async function handleTaskCompletion(taskId: string, taskData: any) {
 // Helper function to send task completion notification
 async function sendTaskCompletionNotification(
   userId: string,
-  taskData: any,
+  taskData: TaskData,
   taskId: string
 ) {
   try {
@@ -409,8 +416,8 @@ async function sendTaskCompletionNotification(
 // Helper function to send comment notification
 async function sendCommentNotification(
   userId: string,
-  taskData: any,
-  commentData: any
+  taskData: TaskData & { id: string },
+  commentData: { id: string; userId: string; userName: string; mentions?: string[] }
 ) {
   try {
     const userDoc = await db.doc(`users/${userId}`).get();
@@ -557,7 +564,14 @@ async function updateUserStats(userId: string) {
 }
 
 // Helper function to create activity log
-async function createActivityLog(activity: any) {
+interface ActivityLogInput {
+  taskId: string;
+  userId: string;
+  action: 'created' | 'completed' | 'updated' | 'commented';
+  details?: Record<string, unknown>;
+}
+
+async function createActivityLog(activity: ActivityLogInput) {
   try {
     await db.collection('activities').add({
       ...activity,
@@ -569,7 +583,7 @@ async function createActivityLog(activity: any) {
 }
 
 // Helper function to send weekly summary
-async function sendWeeklySummaryToGroup(groupId: string, groupData: any) {
+async function sendWeeklySummaryToGroup(groupId: string, groupData: { memberIds?: string[] }) {
   try {
     const memberIds = groupData.memberIds || [];
 
@@ -630,7 +644,7 @@ async function sendWeeklySummaryToGroup(groupId: string, groupData: any) {
 // Helper function to send task reassignment notification
 async function sendTaskReassignmentNotification(
   userId: string,
-  taskData: any,
+  taskData: Pick<TaskData, 'title'>,
   taskId: string
 ) {
   try {
