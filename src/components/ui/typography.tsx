@@ -55,6 +55,7 @@ export const Typography = {
   Display,
   Code,
   Quote,
+  Small: Caption,
 };
 
 export default Typography;
