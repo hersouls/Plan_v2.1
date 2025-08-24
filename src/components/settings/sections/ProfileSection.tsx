@@ -16,6 +16,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isActive }) => {
   const [localEditData, setLocalEditData] = useState(settings.profile);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [localEditData, setLocalEditData] = useState<UserProfile | null>(null);
+
 
   // 프로필 완성도 계산 최적화
   const profileCompletion = useMemo(() => {
@@ -63,10 +65,6 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isActive }) => {
       console.error('프로필 저장 실패:', error);
     }
   };
-
-  const handleFieldEdit = (fieldKey: string) => {
-    setEditingField(fieldKey);
-    setFormErrors({});
   };
 
   if (!isActive) return null;

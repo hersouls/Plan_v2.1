@@ -57,17 +57,29 @@ export const MentionInput: React.FC<MentionInputProps> = ({
 
     // 그룹 멤버 추가
     // DataContext에서는 멤버 직접 제공하지 않으므로 currentGroup 기반 안전 처리
-    if (currentGroup && (currentGroup as any).members) {
-      ((currentGroup as any).members as any[]).forEach((member: any) => {
-        if (member.id !== user?.uid) {
-          users.push({
-            id: member.id,
-            name: member.displayName || member.email || '사용자',
-            email: member.email || '',
-            avatar: member.photoURL || undefined,
-          });
-        }
-      });
+    {
+      type MentionableMember = {
+        id: string;
+        displayName?: string;
+        email?: string;
+        photoURL?: string;
+      };
+      const isMentionMemberArray = (value: unknown): value is MentionableMember[] => {
+        return Array.isArray(value) && value.every(m => m && typeof m === 'object' && 'id' in m);
+      };
+      const maybeMembers: unknown = (currentGroup as unknown as { members?: unknown })?.members;
+      if (isMentionMemberArray(maybeMembers)) {
+        maybeMembers.forEach(member => {
+          if (member.id !== user?.uid) {
+            users.push({
+              id: member.id,
+              name: member.displayName || member.email || '사용자',
+              email: member.email || '',
+              avatar: member.photoURL || undefined,
+            });
+          }
+        });
+      }
     }
 
     return users;
