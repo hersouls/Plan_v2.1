@@ -177,6 +177,8 @@ function settingsReducer(
     default:
       return state;
   }
+};
+
 interface SettingsProviderProps {
   children: React.ReactNode;
 }
