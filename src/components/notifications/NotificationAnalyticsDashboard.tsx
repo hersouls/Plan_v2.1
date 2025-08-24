@@ -439,11 +439,9 @@ export const NotificationAnalyticsDashboard: React.FC<
           <GlassCard className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <Typography.Small className="text-gray-600">
-                  총 발송
-                </Typography.Small>
+                <Typography.Small className="text-gray-600">총 발송</Typography.Small>
                 <Typography.H3 className="text-2xl font-bold">
-                  {analytics.totalSent.toLocaleString()}
+                  {(analytics?.totalSent ?? 0).toLocaleString()}
                 </Typography.H3>
               </div>
               <Bell className="w-8 h-8 text-blue-500" />
@@ -453,17 +451,15 @@ export const NotificationAnalyticsDashboard: React.FC<
           <GlassCard className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <Typography.Small className="text-gray-600">
-                  성공률
-                </Typography.Small>
+                <Typography.Small className="text-gray-600">성공률</Typography.Small>
                 <Typography.H3 className="text-2xl font-bold text-green-600">
-                  {analytics.totalSent > 0
+                  {analytics && analytics.totalSent > 0
                     ? (
                         ((analytics.totalSent - analytics.totalFailed) /
                           analytics.totalSent) *
                         100
                       ).toFixed(1)
-                    : '0'}
+                    : '0.0'}
                   %
                 </Typography.H3>
               </div>
@@ -474,11 +470,9 @@ export const NotificationAnalyticsDashboard: React.FC<
           <GlassCard className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <Typography.Small className="text-gray-600">
-                  실패
-                </Typography.Small>
+                <Typography.Small className="text-gray-600">실패</Typography.Small>
                 <Typography.H3 className="text-2xl font-bold text-red-600">
-                  {analytics.totalFailed.toLocaleString()}
+                  {(analytics?.totalFailed ?? 0).toLocaleString()}
                 </Typography.H3>
               </div>
               <XCircle className="w-8 h-8 text-red-500" />
@@ -488,11 +482,9 @@ export const NotificationAnalyticsDashboard: React.FC<
           <GlassCard className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <Typography.Small className="text-gray-600">
-                  평균 응답시간
-                </Typography.Small>
+                <Typography.Small className="text-gray-600">평균 응답시간</Typography.Small>
                 <Typography.H3 className="text-2xl font-bold">
-                  {analytics.avgResponseTime.toFixed(1)}ms
+                  {analytics ? analytics.averageResponseTime.toFixed(1) : 0}ms
                 </Typography.H3>
               </div>
               <Clock className="w-8 h-8 text-purple-500" />
@@ -531,35 +523,27 @@ export const NotificationAnalyticsDashboard: React.FC<
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <Typography.H5 className="text-blue-600">
-                {retryStats.pending}
+                {retryStats?.pending ?? 0}
               </Typography.H5>
-              <Typography.Small className="text-gray-600">
-                대기중
-              </Typography.Small>
+              <Typography.Small className="text-gray-600">대기중</Typography.Small>
             </div>
             <div className="text-center">
               <Typography.H5 className="text-yellow-600">
-                {retryStats.retrying}
+                {retryStats?.retrying ?? 0}
               </Typography.H5>
-              <Typography.Small className="text-gray-600">
-                재시도중
-              </Typography.Small>
+              <Typography.Small className="text-gray-600">재시도중</Typography.Small>
             </div>
             <div className="text-center">
               <Typography.H5 className="text-red-600">
-                {retryStats.failed}
+                {retryStats?.failed ?? 0}
               </Typography.H5>
-              <Typography.Small className="text-gray-600">
-                실패
-              </Typography.Small>
+              <Typography.Small className="text-gray-600">실패</Typography.Small>
             </div>
             <div className="text-center">
               <Typography.H5 className="text-green-600">
-                {retryStats.success}
+                {retryStats?.success ?? 0}
               </Typography.H5>
-              <Typography.Small className="text-gray-600">
-                성공
-              </Typography.Small>
+              <Typography.Small className="text-gray-600">성공</Typography.Small>
             </div>
           </div>
         </GlassCard>

@@ -162,11 +162,11 @@ export const AdvancedFilterPanel = ({
                   <PopoverContent className="w-auto p-0" align="start">
                     <CalendarComponent
                       mode="single"
-                      selected={localFilters.dateRange.start}
+                      selected={localFilters.dateRange.start ?? undefined}
                       onSelect={(date) =>
                         handleFilterChange('dateRange', {
                           ...localFilters.dateRange,
-                          start: date,
+                          start: date ?? null,
                         })
                       }
                       initialFocus
@@ -194,11 +194,11 @@ export const AdvancedFilterPanel = ({
                   <PopoverContent className="w-auto p-0" align="start">
                     <CalendarComponent
                       mode="single"
-                      selected={localFilters.dateRange.end}
+                      selected={localFilters.dateRange.end ?? undefined}
                       onSelect={(date) =>
                         handleFilterChange('dateRange', {
                           ...localFilters.dateRange,
-                          end: date,
+                          end: date ?? null,
                         })
                       }
                       initialFocus
