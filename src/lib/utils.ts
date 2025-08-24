@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+// eslint-disable-next-line no-console
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

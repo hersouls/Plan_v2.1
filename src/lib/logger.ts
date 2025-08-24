@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+// eslint-disable-next-line no-console
 
 // Lightweight logger with environment-aware levels
 // - In development: debug/info/warn/error 출력
