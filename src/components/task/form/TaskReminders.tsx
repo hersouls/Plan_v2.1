@@ -20,6 +20,7 @@ interface TaskRemindersProps {
 
 export const TaskReminders: React.FC<TaskRemindersProps> = React.memo(({
   formData,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   errors,
   onFormDataChange,
 }) => {

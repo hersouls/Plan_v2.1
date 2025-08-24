@@ -61,8 +61,7 @@ function Statistics() {
     groupId: selectedGroupId || undefined,
   });
   const [dateRange, setDateRange] = useState<DateRange>('30days');
-  const [selectedMemberId, setSelectedMemberId] = useState<string>('ALL');
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [selectedMemberId] = useState<string>('ALL');
 
   // 포인트 통계 상태
   const [pointStats, setPointStats] = useState<Record<string, PointStats>>({});
