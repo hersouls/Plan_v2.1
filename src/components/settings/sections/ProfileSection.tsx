@@ -22,7 +22,6 @@ import { SettingsGroup } from '../components';
 import { useSettingsContext } from '../contexts/SettingsContextBase';
 import type { SettingsSectionProps } from '../types';
 import type { UserProfile } from '../types';
-import logger from '../../../lib/logger';
 
 export function ProfileSection({
   isActive,
@@ -40,11 +39,7 @@ export function ProfileSection({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  // editData는 항상 현재 settings.profile을 사용하거나 편집 중일 때만 로컬 상태 사용
-    () => (isEditing && localEditData ? localEditData : settings.profile),
-    [isEditing, localEditData, settings.profile]
-  );
+  const [localEditData, setLocalEditData] = useState<UserProfile | null>(null);
 
   // 프로필 완성도 계산 최적화
   const profileCompletion = useMemo(() => {
@@ -61,12 +56,13 @@ export function ProfileSection({
 
   // 미완료 필드 목록
   const incompleteFields = useMemo(() => {
+    const fields = [
       { key: 'displayName', label: '이름', icon: User },
       { key: 'phone', label: '전화번호', icon: Phone },
       { key: 'location', label: '위치', icon: MapPin },
       { key: 'bio', label: '자기소개', icon: Globe },
     ];
-    return fields.filter(field => !settings.profile[field.key]);
+    return fields.filter(field => !settings.profile[field.key as keyof UserProfile]);
   }, [settings.profile]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,6 +143,7 @@ export function ProfileSection({
     }
     setEditingField(fieldKey);
   };
+  const handleFieldSave = async (fieldKey: keyof UserProfile) => {
     if (!localEditData) return;
 
     try {
@@ -219,6 +216,8 @@ export function ProfileSection({
     }
     return name.substring(0, 2).toUpperCase();
   };
+  const renderField = (
+    fieldKey: keyof UserProfile,
     label: string,
     icon: React.ComponentType<{ size?: number | string; className?: string }>,
     placeholder: string,
@@ -227,6 +226,11 @@ export function ProfileSection({
     const isFieldEditing = editingField === fieldKey;
     const hasError = formErrors[fieldKey];
     const IconComponent = icon;
+    const value = (
+      (isEditing && localEditData
+        ? (localEditData[fieldKey] as unknown)
+        : (settings.profile[fieldKey] as unknown)) as string
+    ) || '';
 
     return (
       <div className="field-group">
@@ -253,6 +257,7 @@ export function ProfileSection({
                 value={value}
                 onChange={e =>
                   setLocalEditData(prev => ({
+                    ...(prev || ({} as UserProfile)),
                     [fieldKey]: e.target.value,
                   }))
                 }
@@ -271,6 +276,7 @@ export function ProfileSection({
                 value={value}
                 onChange={e =>
                   setLocalEditData(prev => ({
+                    ...(prev || ({} as UserProfile)),
                     [fieldKey]: e.target.value,
                   }))
                 }
